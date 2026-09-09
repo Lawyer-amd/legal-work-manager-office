@@ -3,11 +3,30 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { type AppealStatus, type CaseStatus, type ClientType, DataStore, DataStoreError, type DocumentLink, type DocumentOwnerType, type ExecutionFollowUp, type ExecutionStatus, formatDate, isActive, type JudgmentType, type RecordType, type TaskStatus, type TransactionStatus } from './dataStore'
 
-const sections = ['لوحة المتابعة', 'العملاء', 'القضايا', 'الجلسات', 'المعاملات', 'المهام', 'التنفيذ', 'الأحكام', 'الاستئناف', 'المستندات', 'سلة المحذوفات']
+const workspaceDefinitions = [
+  { id: 'اليوم', label: 'اليوم', description: 'المواعيد والتنبيهات', sections: ['لوحة المتابعة'] },
+  { id: 'القضايا', label: 'القضايا', description: 'ملفات القضايا ونتائجها', sections: ['القضايا', 'الأحكام', 'الاستئناف', 'التنفيذ'] },
+  { id: 'العمل', label: 'العمل', description: 'جلسات ومهام ومعاملات', sections: ['الجلسات', 'المهام', 'المعاملات'] },
+  { id: 'العملاء', label: 'العملاء', description: 'بيانات العملاء', sections: ['العملاء'] },
+  { id: 'المستندات', label: 'المستندات', description: 'فهرس روابط الملفات', sections: ['المستندات'] },
+] as const
+type WorkspaceId = typeof workspaceDefinitions[number]['id']
+type AppSettings = { officeName: string; landingWorkspace: WorkspaceId; agencyWarningDays: number; compactTables: boolean }
+const settingsKey = 'legal-work-manager:settings:v1'
+const defaultSettings: AppSettings = { officeName: 'إدارة العمل القانوني', landingWorkspace: 'اليوم', agencyWarningDays: 20, compactTables: false }
+const loadSettings = (): AppSettings => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(settingsKey) ?? '{}') as Partial<AppSettings>
+    return { ...defaultSettings, ...parsed }
+  } catch { return defaultSettings }
+}
+const sectionForWorkspace = (workspace: WorkspaceId) => workspaceDefinitions.find((item) => item.id === workspace)?.sections[0] ?? 'لوحة المتابعة'
+const workspaceForSection = (section: string): WorkspaceId => workspaceDefinitions.find((item) => item.sections.includes(section as never))?.id ?? 'اليوم'
 const store = new DataStore()
 
 function App() {
-  const [activeSection, setActiveSection] = useState(sections[0])
+  const [settings, setSettings] = useState<AppSettings>(loadSettings)
+  const [activeSection, setActiveSection] = useState<string>(() => sectionForWorkspace(loadSettings().landingWorkspace))
   const [revision, setRevision] = useState(0)
   const data = useMemo(() => store.snapshot(), [revision])
   const clients = data.clients.filter(isActive)
@@ -22,23 +41,25 @@ function App() {
   useEffect(() => { const timer = window.setInterval(() => { store.cleanupTrash(); setRevision((value) => value + 1) }, 60_000); return () => window.clearInterval(timer) }, [])
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${settings.compactTables ? 'compact-tables' : ''}`}>
       <aside className="sidebar">
-        <h1>إدارة العمل القانوني</h1>
-        <p>بيئة تجريبية محلية</p>
-        <nav aria-label="التنقل الرئيسي">
-          {sections.map((section) => <button onClick={() => setActiveSection(section)} className={activeSection === section ? 'active' : ''} key={section}>{section}</button>)}
+        <div className="brand"><span className="brand-mark">م</span><div><h1>{settings.officeName}</h1><p>منظم العمل القانوني</p></div></div>
+        <nav className="workspace-nav" aria-label="مساحات العمل">
+          {workspaceDefinitions.map((workspace) => <button aria-label={workspace.label} onClick={() => setActiveSection(sectionForWorkspace(workspace.id))} className={workspaceForSection(activeSection) === workspace.id ? 'active' : ''} key={workspace.id}><b>{workspace.label}</b><small>{workspace.description}</small></button>)}
         </nav>
+        {workspaceForSection(activeSection) !== 'اليوم' && <nav className="section-nav" aria-label="لوحات مساحة العمل">{workspaceDefinitions.find((item) => item.id === workspaceForSection(activeSection))?.sections.map((section) => <button onClick={() => setActiveSection(section)} className={activeSection === section ? 'active' : ''} key={section}>{section}</button>)}</nav>}
+        <div className="sidebar-footer"><button onClick={() => setActiveSection('الإعدادات')} className={activeSection === 'الإعدادات' ? 'active' : ''}>الإعدادات</button><button onClick={() => setActiveSection('سلة المحذوفات')} className={activeSection === 'سلة المحذوفات' ? 'active' : ''}>سلة المحذوفات</button></div>
       </aside>
       <section className="content">
         <header>
           <div>
-            <p className="eyebrow">{activeSection}</p>
-            <h2>{activeSection === 'لوحة المتابعة' ? 'مرحبًا بك' : activeSection}</h2>
+            <p className="eyebrow">{activeSection === 'لوحة المتابعة' ? 'مركز يوم العمل' : workspaceForSection(activeSection)}</p>
+            <h2>{activeSection === 'لوحة المتابعة' ? 'اليوم' : activeSection}</h2>
           </div>
+          <button className="header-settings" onClick={() => setActiveSection('الإعدادات')}>الإعدادات</button>
         </header>
         {store.getLoadWarning() && <p className="notice warning">{store.getLoadWarning()}</p>}
-        {activeSection === 'لوحة المتابعة' ? <Dashboard clients={clients} cases={legalCases} sessions={activeSessions} transactions={transactions} tasks={tasks} executions={executions} appeals={appeals} onOpenSection={setActiveSection} /> : activeSection === 'العملاء' ? <ClientsPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'القضايا' ? <CasesPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'الجلسات' ? <SessionsPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'المعاملات' ? <TransactionsPanel clients={clients} cases={legalCases} transactions={transactions} refresh={refresh} /> : activeSection === 'المهام' ? <TasksPanel clients={clients} cases={legalCases} tasks={tasks} refresh={refresh} /> : activeSection === 'التنفيذ' ? <ExecutionsPanel clients={clients} cases={legalCases} judgments={judgments} executions={executions} refresh={refresh} /> : activeSection === 'الأحكام' ? <JudgmentsPanel clients={clients} cases={legalCases} judgments={judgments} refresh={refresh} /> : activeSection === 'الاستئناف' ? <AppealsPanel clients={clients} cases={legalCases} judgments={judgments} appeals={appeals} refresh={refresh} /> : activeSection === 'المستندات' ? <DocumentsPanel data={data} refresh={refresh} /> : activeSection === 'سلة المحذوفات' ? <TrashPanel refresh={refresh} /> : <SectionPlaceholder title={activeSection} />}
+        {activeSection === 'لوحة المتابعة' ? <Dashboard clients={clients} cases={legalCases} sessions={activeSessions} transactions={transactions} tasks={tasks} executions={executions} appeals={appeals} agencyWarningDays={settings.agencyWarningDays} onOpenSection={setActiveSection} /> : activeSection === 'العملاء' ? <ClientsPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'القضايا' ? <CasesPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'الجلسات' ? <SessionsPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'المعاملات' ? <TransactionsPanel clients={clients} cases={legalCases} transactions={transactions} refresh={refresh} /> : activeSection === 'المهام' ? <TasksPanel clients={clients} cases={legalCases} tasks={tasks} refresh={refresh} /> : activeSection === 'التنفيذ' ? <ExecutionsPanel clients={clients} cases={legalCases} judgments={judgments} executions={executions} refresh={refresh} /> : activeSection === 'الأحكام' ? <JudgmentsPanel clients={clients} cases={legalCases} judgments={judgments} refresh={refresh} /> : activeSection === 'الاستئناف' ? <AppealsPanel clients={clients} cases={legalCases} judgments={judgments} appeals={appeals} refresh={refresh} /> : activeSection === 'المستندات' ? <DocumentsPanel data={data} refresh={refresh} /> : activeSection === 'سلة المحذوفات' ? <TrashPanel refresh={refresh} /> : activeSection === 'الإعدادات' ? <SettingsPanel settings={settings} onSave={(next) => { localStorage.setItem(settingsKey, JSON.stringify(next)); setSettings(next) }} onReset={() => { localStorage.removeItem(settingsKey); setSettings(defaultSettings) }} /> : <SectionPlaceholder title={activeSection} />}
       </section>
     </main>
   )
@@ -56,7 +77,7 @@ const datePlusDays = (date: string, durationDays: number) => {
 type DashboardItem = { id: string; kind: 'جلسة' | 'إجراء قضية' | 'معاملة' | 'مهمة' | 'تنفيذ' | 'استئناف' | 'وكالة'; section: string; title: string; detail: string; date: string; time?: string; days: number }
 const deadlineLabel = (days: number) => days < 0 ? `متأخر ${Math.abs(days)} يوم` : days === 0 ? 'اليوم' : days <= 3 ? `خلال ${days} أيام` : `متبقي ${days} يوم`
 
-function Dashboard({ clients, cases, sessions, transactions, tasks, executions, appeals, onOpenSection }: { clients: ReturnType<DataStore['snapshot']>['clients']; cases: ReturnType<DataStore['snapshot']>['cases']; sessions: ReturnType<DataStore['snapshot']>['sessions']; transactions: ReturnType<DataStore['snapshot']>['transactions']; tasks: ReturnType<DataStore['snapshot']>['tasks']; executions: ReturnType<DataStore['snapshot']>['executions']; appeals: ReturnType<DataStore['snapshot']>['appeals']; onOpenSection: (section: string) => void }) {
+function Dashboard({ clients, cases, sessions, transactions, tasks, executions, appeals, agencyWarningDays, onOpenSection }: { clients: ReturnType<DataStore['snapshot']>['clients']; cases: ReturnType<DataStore['snapshot']>['cases']; sessions: ReturnType<DataStore['snapshot']>['sessions']; transactions: ReturnType<DataStore['snapshot']>['transactions']; tasks: ReturnType<DataStore['snapshot']>['tasks']; executions: ReturnType<DataStore['snapshot']>['executions']; appeals: ReturnType<DataStore['snapshot']>['appeals']; agencyWarningDays: number; onOpenSection: (section: string) => void }) {
   const [range, setRange] = useState<'today' | '3' | '7' | '30' | 'all'>('7')
   const [kind, setKind] = useState<DashboardItem['kind'] | 'الكل'>('الكل')
   const caseDetails = (caseId?: string) => {
@@ -73,7 +94,7 @@ function Dashboard({ clients, cases, sessions, transactions, tasks, executions, 
     ...appeals.filter((item) => item.status !== 'منتهي' && item.judgmentDate).map((item) => { const details = caseDetails(item.caseId); const date = datePlusDays(item.judgmentDate, item.durationDays); return { id: `appeal-${item.id}`, kind: 'استئناف' as const, section: 'الاستئناف', title: `آخر يوم للاستئناف — ${details.number}`, detail: item.judgmentText || details.parties, date, days: daysUntil(date) } }),
     ...cases.filter((item) => item.status !== 'منتهية' && item.agencyExpiryDate).map((item) => { const details = caseDetails(item.id); return { id: `agency-${item.id}`, kind: 'وكالة' as const, section: 'القضايا', title: `انتهاء الوكالة — ${details.number}`, detail: details.parties, date: item.agencyExpiryDate!, days: daysUntil(item.agencyExpiryDate!) } }),
   ].sort((a: DashboardItem, b: DashboardItem) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
-  const agencyWatch = timeline.filter((item) => item.kind === 'وكالة' && item.days >= 0 && item.days < 20)
+  const agencyWatch = timeline.filter((item) => item.kind === 'وكالة' && item.days >= 0 && item.days < agencyWarningDays)
   const rangeDays = range === 'today' ? 0 : range === 'all' ? Infinity : Number(range)
   const shownTimeline = timeline.filter((item) => (kind === 'الكل' || item.kind === kind) && item.days <= rangeDays)
   const sessionToday = timeline.filter((item) => item.kind === 'جلسة' && item.days === 0)
@@ -93,9 +114,7 @@ function Dashboard({ clients, cases, sessions, transactions, tasks, executions, 
       <Stat label="جلسات اليوم" value={sessionToday.length} urgent={sessionToday.length > 0} />
       <Stat label="مواعيد متأخرة" value={overdue.length} urgent={overdue.length > 0} />
       <Stat label="استحقاقات اليوم" value={today.length} urgent={today.length > 0} />
-      <Stat label="خلال 3 أيام" value={timeline.filter((item) => item.days >= 0 && item.days <= 3).length} />
-      <Stat label="مهل استئناف حرجة" value={appealUrgent.length} urgent={appealUrgent.length > 0} />
-      <Stat label="وكالات خلال 20 يومًا" value={agencyWatch.length} urgent={agencyWatch.length > 0} />
+      <Stat label={`وكالات خلال ${agencyWarningDays} يومًا`} value={agencyWatch.length} urgent={agencyWatch.length > 0} />
     </div>
 
     <section className="dashboard-section agenda-section" aria-labelledby="agenda-title">
@@ -116,10 +135,10 @@ function Dashboard({ clients, cases, sessions, transactions, tasks, executions, 
 
     <section className="dashboard-grid">
       <section className="agency-watch dashboard-card" aria-labelledby="agency-watch-title">
-        <div className="dashboard-section-head"><div><p className="eyebrow">تنبيه الوكالات</p><h3 id="agency-watch-title">الوكالات القريبة من الانتهاء</h3><p className="muted">قضايا فعالة بقي على وكالتها أقل من 20 يومًا.</p></div><button className="secondary" onClick={() => onOpenSection('القضايا')}>فتح القضايا</button></div>
+        <div className="dashboard-section-head"><div><p className="eyebrow">تنبيه الوكالات</p><h3 id="agency-watch-title">الوكالات القريبة من الانتهاء</h3><p className="muted">قضايا فعالة بقي على وكالتها أقل من {agencyWarningDays} يومًا.</p></div><button className="secondary" onClick={() => onOpenSection('القضايا')}>فتح القضايا</button></div>
       {agencyWatch.length ? <div className="table-wrap"><table><thead><tr><th>رقم القضية</th><th>الأطراف</th><th>انتهاء الوكالة</th><th>المتبقي</th></tr></thead><tbody>
         {agencyWatch.map((item) => <tr key={item.id}><td>{item.title.replace('انتهاء الوكالة — ', '')}</td><td>{item.detail}</td><td><b>{formatDate(item.date)}</b><small className="block">{item.date}</small></td><td><span className={`agency-countdown ${item.days <= 3 ? 'critical' : ''}`}>{item.days === 0 ? 'تنتهي اليوم' : `متبقي ${item.days} يوم`}</span></td></tr>)}
-      </tbody></table></div> : <div className="empty-state"><h3>لا توجد وكالات قريبة من الانتهاء</h3><p>تظهر هنا الوكالات التي بقي على انتهائها أقل من 20 يومًا.</p></div>}
+      </tbody></table></div> : <div className="empty-state"><h3>لا توجد وكالات قريبة من الانتهاء</h3><p>تظهر هنا الوكالات التي بقي على انتهائها أقل من {agencyWarningDays} يومًا.</p></div>}
       </section>
       <article className="dashboard-card appeal-card"><div className="dashboard-section-head"><div><p className="eyebrow">الاستئناف</p><h3>المهل القريبة أو المنتهية</h3></div><button className="secondary" onClick={() => onOpenSection('الاستئناف')}>فتح الاستئناف</button></div>
         {appealUrgent.length ? <div className="compact-list">{appealUrgent.slice(0, 5).map((item) => <div key={item.id}><span className={item.days < 0 ? 'danger-text' : ''}>{deadlineLabel(item.days)}</span><b>{item.title}</b><small>{item.detail}</small></div>)}</div> : <p className="muted">لا توجد مهلات استئناف حرجة حاليًا.</p>}
@@ -141,6 +160,29 @@ function TwoStepDeleteDialog({ title, message, onCancel, onConfirm }: { title: s
 }
 
 const typeNames: Record<RecordType, string> = { clients: 'عميل', cases: 'قضية', sessions: 'جلسة', transactions: 'معاملة', tasks: 'مهمة', executions: 'طلب تنفيذ', judgments: 'حكم', appeals: 'استئناف', documents: 'مستند' }
+
+function SettingsPanel({ settings, onSave, onReset }: { settings: AppSettings; onSave: (settings: AppSettings) => void; onReset: () => void }) {
+  const [form, setForm] = useState(settings)
+  const [message, setMessage] = useState('')
+  useEffect(() => setForm(settings), [settings])
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault()
+    onSave({ ...form, officeName: form.officeName.trim() || defaultSettings.officeName, agencyWarningDays: Math.max(1, Math.min(90, Number(form.agencyWarningDays) || 20)) })
+    setMessage('تم حفظ الإعدادات على هذا الجهاز.')
+  }
+  return <section className="panel settings-panel">
+    <div className="section-actions"><div><h3>الإعدادات</h3><p className="muted">خيارات العرض والمتابعة التي تناسب طريقة عمل المكتب. لا تغيّر هذه الإعدادات سجلات القضايا أو المستندات.</p></div></div>
+    {message && <p className="notice" role="status">{message}</p>}
+    <form className="record-form" onSubmit={submit}>
+      <label>اسم المكتب في الواجهة<input value={form.officeName} onChange={(event) => setForm({ ...form, officeName: event.target.value })} /></label>
+      <label>الصفحة عند فتح التطبيق<select value={form.landingWorkspace} onChange={(event) => setForm({ ...form, landingWorkspace: event.target.value as WorkspaceId })}>{workspaceDefinitions.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.label}</option>)}</select></label>
+      <label>التنبيه قبل انتهاء الوكالة بالأيام<input type="number" min="1" max="90" value={form.agencyWarningDays} onChange={(event) => setForm({ ...form, agencyWarningDays: Number(event.target.value) })} /><small>يُعرض التنبيه في صفحة اليوم للقضايا الفعالة.</small></label>
+      <label className="setting-toggle">كثافة الجداول<input type="checkbox" checked={form.compactTables} onChange={(event) => setForm({ ...form, compactTables: event.target.checked })} /><span>عرض مضغوط للصفوف</span></label>
+      <div className="form-actions"><button type="button" onClick={() => { onReset(); setMessage('تمت استعادة إعدادات العرض الافتراضية.') }}>استعادة الإعدادات الافتراضية</button><button className="primary" type="submit">حفظ الإعدادات</button></div>
+    </form>
+    <div className="settings-note"><b>حفظ محلي</b><p>تحفظ هذه الخيارات في متصفح هذا الجهاز، وتبقى بيانات التطبيق وسجلاته مستقلة عنها.</p></div>
+  </section>
+}
 
 function DocumentsPanel({ data, refresh }: { data: ReturnType<DataStore['snapshot']>; refresh: () => void }) {
   const [showForm, setShowForm] = useState(false)

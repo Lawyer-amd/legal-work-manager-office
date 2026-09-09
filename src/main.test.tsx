@@ -6,7 +6,7 @@ const click = async (element: Element | undefined) => {
   if (!element) throw new Error('العنصر المطلوب غير موجود')
   await act(async () => element.dispatchEvent(new MouseEvent('click', { bubbles: true })))
 }
-const button = (name: string) => [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === name)
+const button = (name: string) => [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === name || item.getAttribute('aria-label') === name)
 
 describe('واجهة التطبيق', () => {
   beforeAll(async () => {
@@ -16,11 +16,13 @@ describe('واجهة التطبيق', () => {
     await act(async () => { await import('./main') })
   })
 
-  it('تعرض اللوحات الأساسية وسلة المحذوفات دون زر لوحة المتابعة المعطل', () => {
+  it('تعرض مساحات العمل الأساسية والإعدادات دون زر إضافة سجل عام', async () => {
+    await click(button('القضايا'))
     expect(button('العملاء')).toBeDefined()
     expect(button('الاستئناف')).toBeDefined()
     expect(button('سلة المحذوفات')).toBeDefined()
     expect(button('المستندات')).toBeDefined()
+    expect(button('الإعدادات')).toBeDefined()
     expect(button('إضافة سجل')).toBeUndefined()
   })
 
@@ -64,12 +66,13 @@ describe('واجهة التطبيق', () => {
       dateInput.dispatchEvent(new Event('change', { bubbles: true }))
     })
     await click(button('حفظ التعديل'))
-    await click(button('لوحة المتابعة'))
+    await click(button('اليوم'))
     expect(document.body.textContent).toContain('الوكالات القريبة من الانتهاء')
     expect(document.body.textContent).toContain('متبقي 5 يوم')
   })
 
   it('تعرض مركز المواعيد وتنتقل إلى اللوحة المرتبطة من عنصر المتابعة', async () => {
+    await click(button('اليوم'))
     expect(document.body.textContent).toContain('أقرب المواعيد والإجراءات')
     expect(document.body.textContent).toContain('جلسات اليوم وما يحتاج تحديثًا')
     expect(document.body.textContent).toContain('إجراءات مرتبطة بوقت')
@@ -77,5 +80,21 @@ describe('واجهة التطبيق', () => {
     expect(document.body.textContent).toContain('انتهاء الوكالة')
     await click(button('فتح القضايا'))
     expect(document.body.textContent).toContain('القضايا الحالية')
+  })
+
+  it('تحفظ إعدادات الواجهة وتطبّق اسم المكتب', async () => {
+    await click(button('الإعدادات'))
+    expect(document.body.textContent).toContain('التنبيه قبل انتهاء الوكالة بالأيام')
+    const officeInput = [...document.querySelectorAll('input')].find((item) => item.value === 'إدارة العمل القانوني')
+    if (!officeInput) throw new Error('حقل اسم المكتب غير موجود')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(officeInput, 'مكتب الاختبار')
+      officeInput.dispatchEvent(new Event('input', { bubbles: true }))
+      officeInput.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await click(button('حفظ الإعدادات'))
+    expect(document.body.textContent).toContain('مكتب الاختبار')
+    expect(localStorage.getItem('legal-work-manager:settings:v1')).toContain('مكتب الاختبار')
   })
 })
