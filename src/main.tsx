@@ -48,7 +48,7 @@ function App() {
     finally { setCloudBusy(false) }
   }
   const writeCloud = async () => {
-    if (!window.confirm('سيتم إرسال نسخة بيانات هذا الجهاز إلى Google Sheets. هل تريد المتابعة؟')) return
+    if (!window.confirm('سيتم استبدال صفوف Google Sheets بنسخة هذا الجهاز. تأكد من القراءة أولًا لتجنب فقد بيانات سحابية. هل تريد المتابعة؟')) return
     setCloudBusy(true); setCloudMessage('جاري حفظ البيانات السحابية…')
     try { await writeCloudSnapshot(store.snapshot()); setCloudMessage('تم حفظ نسخة البيانات في السحابة.') }
     catch (error) { setCloudMessage(error instanceof CloudSyncError ? error.message : 'تعذر حفظ البيانات السحابية.') }
