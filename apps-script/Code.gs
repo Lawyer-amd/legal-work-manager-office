@@ -6,6 +6,9 @@ const SHEETS = {
 const ALL_COLLECTIONS = ['clients', 'cases', 'sessions', 'transactions', 'tasks', 'executions', 'judgments', 'appeals', 'documents']
 
 function doGet(e) {
+  if (!(e && e.parameter && e.parameter.api === '1')) {
+    return HtmlService.createHtmlOutputFromFile('Index').setTitle('إدارة العمل القانوني')
+  }
   const callback = e && e.parameter && e.parameter.callback
   try {
     const data = readSnapshot_()
@@ -25,6 +28,21 @@ function doPost(e) {
     })
     return json_({ ok: true })
   } catch (error) { return json_({ ok: false, error: String(error && error.message || error) }) }
+}
+
+// واجهة داخلية للنسخة المستضافة داخل Apps Script. تستدعيها الواجهة عبر
+// google.script.run، لذلك لا تمر عبر CORS ولا تحتاج فتح صلاحية النشر للعامة.
+function getCloudSnapshot() {
+  return readSnapshot_()
+}
+
+function saveCloudSnapshot(data) {
+  if (!data || typeof data !== 'object') throw new Error('بيانات الحفظ غير صالحة.')
+  var spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID)
+  ALL_COLLECTIONS.forEach(function (name) {
+    writeRows_(spreadsheet, SHEETS[name], data[name] || [])
+  })
+  return { ok: true }
 }
 
 function writeRows_(spreadsheet, sheetName, rows) {

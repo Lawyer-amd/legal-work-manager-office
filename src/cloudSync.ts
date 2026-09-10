@@ -2,10 +2,53 @@ import type { Database } from './dataStore'
 
 export const defaultCloudEndpoint = 'https://script.google.com/macros/s/AKfycbydzfFUqSAr01LXPerM2pujMbsMcBRFJgpaoY3-WG2H1EB4Ge9itdFnl1IgrowtR5551A/exec'
 const requestTimeoutMs = 15_000
+const apiEndpoint = (endpoint: string) => `${endpoint}${endpoint.includes('?') ? '&' : '?'}api=1`
 
 export class CloudSyncError extends Error {}
 
 const collections = ['clients', 'cases', 'sessions', 'transactions', 'tasks', 'executions', 'judgments', 'appeals', 'documents'] as const
+
+type AppsScriptBridge = {
+  script: {
+    run: {
+      withSuccessHandler: (handler: (value: unknown) => void) => AppsScriptBridge['script']['run']
+      withFailureHandler: (handler: (error: unknown) => void) => AppsScriptBridge['script']['run']
+      getCloudSnapshot?: () => void
+      saveCloudSnapshot?: (data: Database) => void
+    }
+  }
+}
+
+const appsScriptBridge = (): AppsScriptBridge | undefined => {
+  if (typeof window === 'undefined') return undefined
+  const candidate = (window as unknown as { google?: AppsScriptBridge }).google
+  return candidate?.script?.run?.getCloudSnapshot && candidate.script.run.saveCloudSnapshot ? candidate : undefined
+}
+
+const readViaAppsScript = (): Promise<Database> => new Promise((resolve, reject) => {
+  const bridge = appsScriptBridge()
+  if (!bridge) return reject(new CloudSyncError('جسر Apps Script غير متاح.'))
+  bridge.script.run
+    .withSuccessHandler((payload) => {
+      const database = extractDatabase(payload)
+      if (database) resolve(structuredClone(database))
+      else reject(new CloudSyncError('استجابة Apps Script لا تحتوي snapshot متوافقًا.'))
+    })
+    .withFailureHandler(() => reject(new CloudSyncError('تعذر قراءة البيانات من Apps Script.')))
+    .getCloudSnapshot!()
+})
+
+const writeViaAppsScript = (database: Database): Promise<void> => new Promise((resolve, reject) => {
+  const bridge = appsScriptBridge()
+  if (!bridge) return reject(new CloudSyncError('جسر Apps Script غير متاح.'))
+  bridge.script.run
+    .withSuccessHandler((payload) => {
+      if (payload && typeof payload === 'object' && (payload as { ok?: boolean }).ok === true) resolve()
+      else reject(new CloudSyncError('رفضت خدمة Apps Script عملية الحفظ.'))
+    })
+    .withFailureHandler(() => reject(new CloudSyncError('تعذر حفظ البيانات في Apps Script.')))
+    .saveCloudSnapshot!(database)
+})
 
 const isDatabase = (value: unknown): value is Database => {
   if (!value || typeof value !== 'object') return false
@@ -25,11 +68,12 @@ const extractDatabase = (value: unknown): Database | undefined => {
 }
 
 export async function readCloudSnapshot(endpoint = import.meta.env.VITE_APPS_SCRIPT_URL || defaultCloudEndpoint, fetcher: typeof fetch = fetch): Promise<Database> {
+  if (appsScriptBridge()) return readViaAppsScript()
   if (!endpoint) throw new CloudSyncError('لم يتم إعداد رابط خدمة المزامنة.')
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), requestTimeoutMs)
   try {
-    const response = await fetcher(endpoint, { method: 'GET', headers: { Accept: 'application/json' }, signal: controller.signal })
+    const response = await fetcher(apiEndpoint(endpoint), { method: 'GET', headers: { Accept: 'application/json' }, signal: controller.signal })
     if (!response.ok) throw new CloudSyncError(`تعذر قراءة السحابة (HTTP ${response.status}).`)
     let payload: unknown
     try { payload = await response.json() } catch { throw new CloudSyncError('استجابة السحابة ليست JSON صالحًا.') }
@@ -45,6 +89,7 @@ export async function readCloudSnapshot(endpoint = import.meta.env.VITE_APPS_SCR
 }
 
 export async function writeCloudSnapshot(database: Database, endpoint = import.meta.env.VITE_APPS_SCRIPT_URL || defaultCloudEndpoint, fetcher: typeof fetch = fetch): Promise<void> {
+  if (appsScriptBridge()) return writeViaAppsScript(database)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 15_000)
   let response: Response
@@ -79,7 +124,7 @@ function readCloudSnapshotJsonp(endpoint: string): Promise<Database> {
       else reject(new CloudSyncError('استجابة السحابة لا تحتوي snapshot متوافقًا مع مخطط التطبيق.'))
     }
     script.onerror = () => { cleanup(); reject(new CloudSyncError('تعذر الاتصال بخدمة البيانات السحابية.')) }
-    script.src = `${endpoint}${endpoint.includes('?') ? '&' : '?'}callback=${encodeURIComponent(callbackName)}`
+    script.src = `${apiEndpoint(endpoint)}&callback=${encodeURIComponent(callbackName)}`
     document.head.appendChild(script)
   })
 }
