@@ -39,6 +39,25 @@ export async function readCloudSnapshot(endpoint = import.meta.env.VITE_APPS_SCR
   } catch (error) {
     if (error instanceof CloudSyncError) throw error
     if (error instanceof DOMException && error.name === 'AbortError') throw new CloudSyncError('انتهت مهلة قراءة البيانات السحابية بعد 15 ثانية.')
+    if (error instanceof TypeError && typeof document !== 'undefined') return readCloudSnapshotJsonp(endpoint)
     throw new CloudSyncError('تعذر الاتصال بخدمة البيانات السحابية.')
   } finally { clearTimeout(timer) }
+}
+
+function readCloudSnapshotJsonp(endpoint: string): Promise<Database> {
+  return new Promise((resolve, reject) => {
+    const callbackName = `__legalCloudSnapshot_${Date.now()}_${Math.random().toString(36).slice(2)}`
+    const script = document.createElement('script')
+    const cleanup = () => { window.clearTimeout(timer); delete (window as unknown as Record<string, unknown>)[callbackName]; script.remove() }
+    const timer = window.setTimeout(() => { cleanup(); reject(new CloudSyncError('انتهت مهلة قراءة السحابة عبر مسار التوافق.')) }, requestTimeoutMs)
+    ;(window as unknown as Record<string, unknown>)[callbackName] = (payload: unknown) => {
+      cleanup()
+      const database = extractDatabase(payload)
+      if (database) resolve(structuredClone(database))
+      else reject(new CloudSyncError('استجابة السحابة لا تحتوي snapshot متوافقًا مع مخطط التطبيق.'))
+    }
+    script.onerror = () => { cleanup(); reject(new CloudSyncError('تعذر الاتصال بخدمة البيانات السحابية.')) }
+    script.src = `${endpoint}${endpoint.includes('?') ? '&' : '?'}callback=${encodeURIComponent(callbackName)}`
+    document.head.appendChild(script)
+  })
 }
