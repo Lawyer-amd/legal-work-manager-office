@@ -5,17 +5,22 @@ const SHEETS = {
 }
 const ALL_COLLECTIONS = ['clients', 'cases', 'sessions', 'transactions', 'tasks', 'executions', 'judgments', 'appeals', 'documents']
 
-function doGet() {
+function doGet(e) {
+  const callback = e && e.parameter && e.parameter.callback
   try {
     const data = readSnapshot_()
-    return json_({ ok: true, data: data })
+    return json_({ ok: true, data: data }, callback)
   } catch (error) {
-    return json_({ ok: false, error: String(error && error.message || error) })
+    return json_({ ok: false, error: String(error && error.message || error) }, callback)
   }
 }
 
-function json_(value) {
-  return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON)
+function json_(value, callback) {
+  const payload = JSON.stringify(value)
+  if (callback && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
+    return ContentService.createTextOutput(callback + '(' + payload + ');').setMimeType(ContentService.MimeType.JAVASCRIPT)
+  }
+  return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON)
 }
 
 function readSnapshot_() {
