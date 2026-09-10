@@ -97,6 +97,7 @@ export class DataStore {
   }
 
   snapshot = () => structuredClone(this.db)
+  replaceSnapshot(next: Database) { this.db = structuredClone(next); this.save() }
   getLoadWarning = () => this.loadWarning
   addClient(input: Omit<Client, keyof RecordBase>) { return this.add<Client>('clients', { ...input, sortOrder: this.nextOrder('clients') }) }
   updateClient(id: string, input: Omit<Client, keyof RecordBase>) { this.update<Client>('clients', id, input) }

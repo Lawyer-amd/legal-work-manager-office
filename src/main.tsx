@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { type AppealStatus, type CaseStatus, type ClientType, DataStore, DataStoreError, type DocumentLink, type DocumentOwnerType, type ExecutionFollowUp, type ExecutionStatus, formatDate, isActive, type JudgmentType, type RecordType, type TaskStatus, type TransactionStatus } from './dataStore'
+import { CloudSyncError, readCloudSnapshot } from './cloudSync'
 
 const workspaceDefinitions = [
   { id: 'اليوم', label: 'اليوم', description: 'المواعيد والتنبيهات', sections: ['لوحة المتابعة'] },
@@ -38,6 +39,14 @@ function App() {
   const appeals = data.appeals.filter(isActive)
   const activeSessions = data.sessions.filter(isActive).filter((session) => session.status === 'جديدة')
   const refresh = () => setRevision((value) => value + 1)
+  const [cloudMessage, setCloudMessage] = useState('')
+  const [cloudBusy, setCloudBusy] = useState(false)
+  const readCloud = async () => {
+    setCloudBusy(true); setCloudMessage('جاري قراءة البيانات السحابية…')
+    try { store.replaceSnapshot(await readCloudSnapshot()); refresh(); setCloudMessage('تمت قراءة snapshot السحابي وحفظه محليًا. لم تُرسل أي تغييرات للسحابة.') }
+    catch (error) { setCloudMessage(error instanceof CloudSyncError ? error.message : 'تعذر قراءة البيانات السحابية.') }
+    finally { setCloudBusy(false) }
+  }
   useEffect(() => { const timer = window.setInterval(() => { store.cleanupTrash(); setRevision((value) => value + 1) }, 60_000); return () => window.clearInterval(timer) }, [])
 
   return (
@@ -59,7 +68,8 @@ function App() {
           <button className="header-settings" onClick={() => setActiveSection('الإعدادات')}>الإعدادات</button>
         </header>
         {store.getLoadWarning() && <p className="notice warning">{store.getLoadWarning()}</p>}
-        {activeSection === 'لوحة المتابعة' ? <Dashboard clients={clients} cases={legalCases} sessions={activeSessions} transactions={transactions} tasks={tasks} executions={executions} appeals={appeals} agencyWarningDays={settings.agencyWarningDays} onOpenSection={setActiveSection} /> : activeSection === 'العملاء' ? <ClientsPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'القضايا' ? <CasesPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'الجلسات' ? <SessionsPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'المعاملات' ? <TransactionsPanel clients={clients} cases={legalCases} transactions={transactions} refresh={refresh} /> : activeSection === 'المهام' ? <TasksPanel clients={clients} cases={legalCases} tasks={tasks} refresh={refresh} /> : activeSection === 'التنفيذ' ? <ExecutionsPanel clients={clients} cases={legalCases} judgments={judgments} executions={executions} refresh={refresh} /> : activeSection === 'الأحكام' ? <JudgmentsPanel clients={clients} cases={legalCases} judgments={judgments} refresh={refresh} /> : activeSection === 'الاستئناف' ? <AppealsPanel clients={clients} cases={legalCases} judgments={judgments} appeals={appeals} refresh={refresh} /> : activeSection === 'المستندات' ? <DocumentsPanel data={data} refresh={refresh} /> : activeSection === 'سلة المحذوفات' ? <TrashPanel refresh={refresh} /> : activeSection === 'الإعدادات' ? <SettingsPanel settings={settings} onSave={(next) => { localStorage.setItem(settingsKey, JSON.stringify(next)); setSettings(next) }} onReset={() => { localStorage.removeItem(settingsKey); setSettings(defaultSettings) }} /> : <SectionPlaceholder title={activeSection} />}
+        {cloudMessage && <p className="notice" role="status">{cloudMessage}</p>}
+        {activeSection === 'لوحة المتابعة' ? <Dashboard clients={clients} cases={legalCases} sessions={activeSessions} transactions={transactions} tasks={tasks} executions={executions} appeals={appeals} agencyWarningDays={settings.agencyWarningDays} onOpenSection={setActiveSection} /> : activeSection === 'العملاء' ? <ClientsPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'القضايا' ? <CasesPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'الجلسات' ? <SessionsPanel clients={clients} cases={legalCases} sessions={data.sessions.filter(isActive)} refresh={refresh} /> : activeSection === 'المعاملات' ? <TransactionsPanel clients={clients} cases={legalCases} transactions={transactions} refresh={refresh} /> : activeSection === 'المهام' ? <TasksPanel clients={clients} cases={legalCases} tasks={tasks} refresh={refresh} /> : activeSection === 'التنفيذ' ? <ExecutionsPanel clients={clients} cases={legalCases} judgments={judgments} executions={executions} refresh={refresh} /> : activeSection === 'الأحكام' ? <JudgmentsPanel clients={clients} cases={legalCases} judgments={judgments} refresh={refresh} /> : activeSection === 'الاستئناف' ? <AppealsPanel clients={clients} cases={legalCases} judgments={judgments} appeals={appeals} refresh={refresh} /> : activeSection === 'المستندات' ? <DocumentsPanel data={data} refresh={refresh} /> : activeSection === 'سلة المحذوفات' ? <TrashPanel refresh={refresh} /> : activeSection === 'الإعدادات' ? <SettingsPanel settings={settings} onSave={(next) => { localStorage.setItem(settingsKey, JSON.stringify(next)); setSettings(next) }} onReset={() => { localStorage.removeItem(settingsKey); setSettings(defaultSettings) }} onReadCloud={readCloud} cloudBusy={cloudBusy} /> : <SectionPlaceholder title={activeSection} />}
       </section>
     </main>
   )
@@ -161,7 +171,7 @@ function TwoStepDeleteDialog({ title, message, onCancel, onConfirm }: { title: s
 
 const typeNames: Record<RecordType, string> = { clients: 'عميل', cases: 'قضية', sessions: 'جلسة', transactions: 'معاملة', tasks: 'مهمة', executions: 'طلب تنفيذ', judgments: 'حكم', appeals: 'استئناف', documents: 'مستند' }
 
-function SettingsPanel({ settings, onSave, onReset }: { settings: AppSettings; onSave: (settings: AppSettings) => void; onReset: () => void }) {
+function SettingsPanel({ settings, onSave, onReset, onReadCloud, cloudBusy }: { settings: AppSettings; onSave: (settings: AppSettings) => void; onReset: () => void; onReadCloud: () => void; cloudBusy: boolean }) {
   const [form, setForm] = useState(settings)
   const [message, setMessage] = useState('')
   useEffect(() => setForm(settings), [settings])
@@ -181,6 +191,7 @@ function SettingsPanel({ settings, onSave, onReset }: { settings: AppSettings; o
       <div className="form-actions"><button type="button" onClick={() => { onReset(); setMessage('تمت استعادة إعدادات العرض الافتراضية.') }}>استعادة الإعدادات الافتراضية</button><button className="primary" type="submit">حفظ الإعدادات</button></div>
     </form>
     <div className="settings-note"><b>حفظ محلي</b><p>تحفظ هذه الخيارات في متصفح هذا الجهاز، وتبقى بيانات التطبيق وسجلاته مستقلة عنها.</p></div>
+    <div className="settings-note"><b>قراءة السحابة</b><p>يقرأ snapshot من خدمة Apps Script ويحفظه محليًا. لا ينفذ هذا الزر أي كتابة إلى Google Sheets.</p><button className="secondary" type="button" onClick={onReadCloud} disabled={cloudBusy}>{cloudBusy ? 'جاري القراءة…' : 'قراءة البيانات السحابية الآن'}</button></div>
   </section>
 }
 
