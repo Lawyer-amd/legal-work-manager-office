@@ -20,9 +20,7 @@ function doPost(e) {
     var body = JSON.parse(e && e.postData && e.postData.contents || '{}')
     if (body.action !== 'upsert' || !body.data) return json_({ ok: false, error: 'طلب حفظ غير صالح.' })
     var spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID)
-    // الكتابة الآلية محصورة حاليًا في اللوحات الجديدة؛ لا نلمس الجداول
-    // الموجودة حتى لا يؤدي اختلاف عناوينها العربية إلى فقدان بياناتها.
-    ['transactions', 'executions', 'judgments', 'appeals'].forEach(function (name) {
+    ALL_COLLECTIONS.forEach(function (name) {
       writeRows_(spreadsheet, SHEETS[name], body.data[name] || [])
     })
     return json_({ ok: true })
@@ -43,7 +41,7 @@ function writeRows_(spreadsheet, sheetName, rows) {
 }
 
 function headerKey_(header) {
-  var map = { 'المعرف': 'id', 'معرف': 'id', 'الاسم': 'name', 'بيانالمعاملة': 'statement', 'بيانالمهمة': 'statement', 'رقمالقضية': 'caseNumber', 'معرفالقضية': 'caseId', 'الحالة': 'status', 'ترتيب': 'sortOrder', 'تاريخالإنشاء': 'createdAt', 'تاريخالتحديث': 'updatedAt', 'تاريخالحكم': 'judgmentDate', 'نوعالحكم': 'judgmentType', 'رقمالصك': 'deedNumber', 'رقمالطلب': 'requestNumber', 'طالبالتنفيذ': 'claimant', 'المنفذضده': 'respondent', 'تاريخالجلسة': 'date', 'التاريخ': 'date', 'الرابط': 'url', 'ملاحظات': 'notes' }
+  var map = { 'المعرف': 'id', 'معرف': 'id', 'الاسم': 'name', 'نوعالعميل': 'clientType', 'رقمالجوال': 'phone', 'رقمالهوية': 'nationalId', 'تاريخالميلاد': 'birthDate', 'الجنس': 'gender', 'الآيبان': 'iban', 'تاريخالتسجيل': 'registeredAt', 'بيانالمعاملة': 'statement', 'بيانالمهمة': 'statement', 'رقمالقضية': 'caseNumber', 'التصنيف': 'classification', 'معرفالعميل': 'clientId', 'الخصم': 'opponentName', 'تاريخالإجراءالسابق': 'previousActionDate', 'تاريخالإجراءالقادم': 'nextActionDate', 'المحامي': 'assignedLawyer', 'رقمالوكالة': 'originalAgencyNumber', 'رقمالوكالةالمعين': 'assignedAgencyNumber', 'تاريخانتهاءالوكالة': 'agencyExpiryDate', 'رابطناجز': 'najizUrl', 'رابطالملف': 'driveFolderUrl', 'معرفالقضية': 'caseId', 'معرفالتنفيذ': 'executionId', 'تاريخالجلسة': 'date', 'التاريخ': 'date', 'الوقت': 'time', 'ملخصالجلسة': 'summary', 'وصفالموعد': 'summary', 'قراراتالجلسة': 'decisions', 'اسمالعميل': 'clientName', 'تاريخالمهمة': 'taskDate', 'المسؤول': 'assignee', 'النوع': 'documentType', 'الرابط': 'url', 'تاريخالمستند': 'documentDate', 'معرفالحكم': 'judgmentId', 'المحكمة': 'court', 'رقمالدائرة': 'circuitNumber', 'رقمالقضيةالخارجية': 'externalCaseNumber', 'رقمصكالحكم': 'externalJudgmentNumber', 'رقمقرار34': 'decision34Number', 'تاريخقرار34': 'decision34Date', 'رقمقرار46': 'decision46Number', 'تاريخقرار46': 'decision46Date', 'رقمالصك': 'deedNumber', 'رابطالصك': 'deedUrl', 'الملخص': 'summary', 'تاريخالتبليغ': 'notificationDate', 'نصالحكم': 'judgmentText', 'بدايةالمهلة': 'deadlineStartDate', 'مدةالمهلة': 'durationDays', 'المتابعات': 'followUps', 'الروابط': 'links', 'بيان': 'statement', 'الحالة': 'status', 'ترتيب': 'sortOrder', 'تاريخالإنشاء': 'createdAt', 'تاريخالتحديث': 'updatedAt', 'ملاحظات': 'notes' }
   return map[normalize_(header)] || header
 }
 
