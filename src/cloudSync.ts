@@ -45,7 +45,12 @@ export async function readCloudSnapshot(endpoint = import.meta.env.VITE_APPS_SCR
 }
 
 export async function writeCloudSnapshot(database: Database, endpoint = import.meta.env.VITE_APPS_SCRIPT_URL || defaultCloudEndpoint, fetcher: typeof fetch = fetch): Promise<void> {
-  const response = await fetcher(endpoint, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'upsert', data: database }) })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15_000)
+  let response: Response
+  try {
+    response = await fetcher(endpoint, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'upsert', data: database }), signal: controller.signal })
+  } finally { clearTimeout(timer) }
   if (response.type === 'opaque') return
   if (!response.ok) throw new CloudSyncError(`تعذر حفظ السحابة (HTTP ${response.status}).`)
   let payload: unknown
