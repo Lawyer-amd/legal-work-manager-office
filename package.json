@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:apps-script": "vite build --base=./ && node scripts/build-apps-script.mjs",
     "preview": "vite preview",
     "test": "vitest run"
   },

@@ -6,6 +6,9 @@ const SHEETS = {
 const ALL_COLLECTIONS = ['clients', 'cases', 'sessions', 'transactions', 'tasks', 'executions', 'judgments', 'appeals', 'documents']
 
 function doGet(e) {
+  if (!(e && e.parameter && e.parameter.api === '1')) {
+    return HtmlService.createHtmlOutputFromFile('Index').setTitle('إدارة العمل القانوني')
+  }
   const callback = e && e.parameter && e.parameter.callback
   try {
     const data = readSnapshot_()
@@ -25,6 +28,21 @@ function doPost(e) {
     })
     return json_({ ok: true })
   } catch (error) { return json_({ ok: false, error: String(error && error.message || error) }) }
+}
+
+// واجهة داخلية للنسخة المستضافة داخل Apps Script. تستدعيها الواجهة عبر
+// google.script.run، لذلك لا تمر عبر CORS ولا تحتاج فتح صلاحية النشر للعامة.
+function getCloudSnapshot() {
+  return readSnapshot_()
+}
+
+function saveCloudSnapshot(data) {
+  if (!data || typeof data !== 'object') throw new Error('بيانات الحفظ غير صالحة.')
+  var spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID)
+  ALL_COLLECTIONS.forEach(function (name) {
+    writeRows_(spreadsheet, SHEETS[name], data[name] || [])
+  })
+  return { ok: true }
 }
 
 function writeRows_(spreadsheet, sheetName, rows) {
@@ -86,6 +104,9 @@ function value_(row, headers, names) {
 }
 
 function normalize_(value) { return String(value || '').trim().toLowerCase().replace(/[\s_]+/g, '') }
+function jsonValue_(value, fallback) {
+  try { return value ? JSON.parse(value) : fallback } catch (error) { return fallback }
+}
 function base_(row, headers) {
   var id = value_(row, headers, ['id', 'المعرف', 'معرف'])
   var now = new Date().toISOString()
@@ -112,6 +133,6 @@ function document_(row, headers) {
   return Object.assign(base_(row, headers), { name: value_(row, headers, ['name', 'الاسم']), documentType: value_(row, headers, ['documentType', 'النوع']), url: value_(row, headers, ['url', 'الرابط']), notes: value_(row, headers, ['notes', 'ملاحظات']), documentDate: value_(row, headers, ['documentDate', 'تاريخ المستند']), links: links })
 }
 function transaction_(row, headers) { return Object.assign(base_(row, headers), { statement: value_(row, headers, ['statement', 'بيان المعاملة']), caseId: value_(row, headers, ['caseId', 'معرف القضية']), clientName: value_(row, headers, ['clientName', 'اسم العميل']), opponentName: value_(row, headers, ['opponentName', 'الخصم']), reviewDate: value_(row, headers, ['reviewDate', 'تاريخ المراجعة']), nextDate: value_(row, headers, ['nextDate', 'التاريخ القادم']), notes: value_(row, headers, ['notes', 'ملاحظات']), status: value_(row, headers, ['status', 'الحالة']) || 'مستمرة', sortOrder: Number(value_(row, headers, ['sortOrder', 'ترتيب']) || 0) }) }
-function execution_(row, headers) { return Object.assign(base_(row, headers), { requestNumber: value_(row, headers, ['requestNumber', 'رقم الطلب']), claimant: value_(row, headers, ['claimant', 'طالب التنفيذ']), respondent: value_(row, headers, ['respondent', 'المنفذ ضده']), court: value_(row, headers, ['court', 'المحكمة']), circuitNumber: value_(row, headers, ['circuitNumber', 'رقم الدائرة']), caseId: value_(row, headers, ['caseId', 'معرف القضية']), externalCaseNumber: value_(row, headers, ['externalCaseNumber', 'رقم القضية الخارجية']), judgmentId: value_(row, headers, ['judgmentId', 'معرف الحكم']), externalJudgmentNumber: value_(row, headers, ['externalJudgmentNumber', 'رقم صك الحكم']), notes: value_(row, headers, ['notes', 'ملاحظات']), decision34Number: value_(row, headers, ['decision34Number', 'رقم قرار 34']), decision34Date: value_(row, headers, ['decision34Date', 'تاريخ قرار 34']), decision46Number: value_(row, headers, ['decision46Number', 'رقم قرار 46']), decision46Date: value_(row, headers, ['decision46Date', 'تاريخ قرار 46']), status: value_(row, headers, ['status', 'الحالة']) || 'قيد التنفيذ', followUps: [], sortOrder: Number(value_(row, headers, ['sortOrder', 'ترتيب']) || 0) }) }
+function execution_(row, headers) { return Object.assign(base_(row, headers), { requestNumber: value_(row, headers, ['requestNumber', 'رقم الطلب']), claimant: value_(row, headers, ['claimant', 'طالب التنفيذ']), respondent: value_(row, headers, ['respondent', 'المنفذ ضده']), court: value_(row, headers, ['court', 'المحكمة']), circuitNumber: value_(row, headers, ['circuitNumber', 'رقم الدائرة']), caseId: value_(row, headers, ['caseId', 'معرف القضية']), externalCaseNumber: value_(row, headers, ['externalCaseNumber', 'رقم القضية الخارجية']), judgmentId: value_(row, headers, ['judgmentId', 'معرف الحكم']), externalJudgmentNumber: value_(row, headers, ['externalJudgmentNumber', 'رقم صك الحكم']), notes: value_(row, headers, ['notes', 'ملاحظات']), decision34Number: value_(row, headers, ['decision34Number', 'رقم قرار 34']), decision34Date: value_(row, headers, ['decision34Date', 'تاريخ قرار 34']), decision46Number: value_(row, headers, ['decision46Number', 'رقم قرار 46']), decision46Date: value_(row, headers, ['decision46Date', 'تاريخ قرار 46']), status: value_(row, headers, ['status', 'الحالة']) || 'قيد التنفيذ', followUps: jsonValue_(value_(row, headers, ['followUps', 'المتابعات']), []), sortOrder: Number(value_(row, headers, ['sortOrder', 'ترتيب']) || 0) }) }
 function judgment_(row, headers) { return Object.assign(base_(row, headers), { caseId: value_(row, headers, ['caseId', 'معرف القضية']), deedNumber: value_(row, headers, ['deedNumber', 'رقم الصك']), deedUrl: value_(row, headers, ['deedUrl', 'رابط الصك']), judgmentDate: value_(row, headers, ['judgmentDate', 'تاريخ الحكم']), judgmentType: value_(row, headers, ['judgmentType', 'نوع الحكم']) || 'ابتدائي', summary: value_(row, headers, ['summary', 'الملخص']), notificationDate: value_(row, headers, ['notificationDate', 'تاريخ التبليغ']), sortOrder: Number(value_(row, headers, ['sortOrder', 'ترتيب']) || 0) }) }
 function appeal_(row, headers) { return Object.assign(base_(row, headers), { caseId: value_(row, headers, ['caseId', 'معرف القضية']), judgmentId: value_(row, headers, ['judgmentId', 'معرف الحكم']), judgmentText: value_(row, headers, ['judgmentText', 'نص الحكم']), judgmentDate: value_(row, headers, ['judgmentDate', 'تاريخ الحكم']), deadlineStartDate: value_(row, headers, ['deadlineStartDate', 'بداية المهلة']) || value_(row, headers, ['judgmentDate', 'تاريخ الحكم']), durationDays: Number(value_(row, headers, ['durationDays', 'مدة المهلة']) || 30), status: value_(row, headers, ['status', 'الحالة']) || 'فترة اعتراضية', sortOrder: Number(value_(row, headers, ['sortOrder', 'ترتيب']) || 0) }) }

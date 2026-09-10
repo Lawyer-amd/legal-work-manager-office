@@ -7,7 +7,7 @@ describe('قراءة snapshot السحابي', () => {
   it('تقبل snapshot مباشرًا أو داخل data', async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ data: emptyDatabase }), { status: 200 }))
     await expect(readCloudSnapshot('https://example.test/read', fetcher)).resolves.toEqual(emptyDatabase)
-    expect(fetcher).toHaveBeenCalledWith('https://example.test/read', expect.objectContaining({ method: 'GET' }))
+    expect(fetcher).toHaveBeenCalledWith('https://example.test/read?api=1', expect.objectContaining({ method: 'GET' }))
   })
 
   it('ترفض استجابة غير متوافقة', async () => {
