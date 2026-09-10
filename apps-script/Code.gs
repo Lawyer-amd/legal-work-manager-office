@@ -32,10 +32,15 @@ function writeRows_(spreadsheet, sheetName, rows) {
   var values = range.getValues()
   var headers = values.length ? values[0].map(String) : Object.keys(rows[0])
   if (!headers.length) return
-  var output = rows.map(function (record) { return headers.map(function (header) { var value = record[header]; if (Array.isArray(value) || (value && typeof value === 'object')) value = JSON.stringify(value); return value == null ? '' : value }) })
+  var output = rows.map(function (record) { return headers.map(function (header) { var value = record[header] != null ? record[header] : record[headerKey_(header)]; if (Array.isArray(value) || (value && typeof value === 'object')) value = JSON.stringify(value); return value == null ? '' : value }) })
   if (sheet.getMaxRows() > 1) sheet.getRange(2, 1, sheet.getMaxRows() - 1, headers.length).clearContent()
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
   if (output.length) sheet.getRange(2, 1, output.length, headers.length).setValues(output)
+}
+
+function headerKey_(header) {
+  var map = { 'المعرف': 'id', 'معرف': 'id', 'الاسم': 'name', 'بيانالمعاملة': 'statement', 'بيانالمهمة': 'statement', 'رقمالقضية': 'caseNumber', 'معرفالقضية': 'caseId', 'الحالة': 'status', 'ترتيب': 'sortOrder', 'تاريخالإنشاء': 'createdAt', 'تاريخالتحديث': 'updatedAt', 'تاريخالحكم': 'judgmentDate', 'نوعالحكم': 'judgmentType', 'رقمالصك': 'deedNumber', 'رقمالطلب': 'requestNumber', 'طالبالتنفيذ': 'claimant', 'المنفذضده': 'respondent', 'تاريخالجلسة': 'date', 'التاريخ': 'date', 'الرابط': 'url', 'ملاحظات': 'notes' }
+  return map[normalize_(header)] || header
 }
 
 function json_(value, callback) {
