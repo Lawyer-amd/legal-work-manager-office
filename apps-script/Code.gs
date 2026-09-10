@@ -20,7 +20,11 @@ function doPost(e) {
     var body = JSON.parse(e && e.postData && e.postData.contents || '{}')
     if (body.action !== 'upsert' || !body.data) return json_({ ok: false, error: 'طلب حفظ غير صالح.' })
     var spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID)
-    Object.keys(SHEETS).forEach(function (name) { writeRows_(spreadsheet, SHEETS[name], body.data[name] || []) })
+    // الكتابة الآلية محصورة حاليًا في اللوحات الجديدة؛ لا نلمس الجداول
+    // الموجودة حتى لا يؤدي اختلاف عناوينها العربية إلى فقدان بياناتها.
+    ['transactions', 'executions', 'judgments', 'appeals'].forEach(function (name) {
+      writeRows_(spreadsheet, SHEETS[name], body.data[name] || [])
+    })
     return json_({ ok: true })
   } catch (error) { return json_({ ok: false, error: String(error && error.message || error) }) }
 }
