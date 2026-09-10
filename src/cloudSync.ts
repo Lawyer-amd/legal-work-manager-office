@@ -51,7 +51,15 @@ export async function writeCloudSnapshot(database: Database, endpoint = import.m
   try {
     response = await fetcher(endpoint, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'upsert', data: database }), signal: controller.signal })
   } finally { clearTimeout(timer) }
-  if (response.type === 'opaque') return
+  if (response.type === 'opaque') {
+    // لا يكشف no-cors نتيجة POST للمتصفح؛ نتحقق بإعادة قراءة snapshot.
+    const verified = await readCloudSnapshot(endpoint, fetcher)
+    const writable = ['transactions', 'executions', 'judgments', 'appeals'] as const
+    if (writable.some((name) => JSON.stringify(verified[name]) !== JSON.stringify(database[name]))) {
+      throw new CloudSyncError('لم تتطابق البيانات بعد التحقق من الحفظ السحابي.')
+    }
+    return
+  }
   if (!response.ok) throw new CloudSyncError(`تعذر حفظ السحابة (HTTP ${response.status}).`)
   let payload: unknown
   try { payload = await response.json() } catch { throw new CloudSyncError('استجابة الحفظ السحابي ليست JSON صالحًا.') }
