@@ -44,6 +44,15 @@ export async function readCloudSnapshot(endpoint = import.meta.env.VITE_APPS_SCR
   } finally { clearTimeout(timer) }
 }
 
+export async function writeCloudSnapshot(database: Database, endpoint = import.meta.env.VITE_APPS_SCRIPT_URL || defaultCloudEndpoint, fetcher: typeof fetch = fetch): Promise<void> {
+  const response = await fetcher(endpoint, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8', Accept: 'application/json' }, body: JSON.stringify({ action: 'upsert', data: database }) })
+  if (response.type === 'opaque') return
+  if (!response.ok) throw new CloudSyncError(`تعذر حفظ السحابة (HTTP ${response.status}).`)
+  let payload: unknown
+  try { payload = await response.json() } catch { throw new CloudSyncError('استجابة الحفظ السحابي ليست JSON صالحًا.') }
+  if (!payload || typeof payload !== 'object' || (payload as { ok?: boolean }).ok !== true) throw new CloudSyncError('رفضت خدمة السحابة عملية الحفظ.')
+}
+
 function readCloudSnapshotJsonp(endpoint: string): Promise<Database> {
   return new Promise((resolve, reject) => {
     const callbackName = `__legalCloudSnapshot_${Date.now()}_${Math.random().toString(36).slice(2)}`

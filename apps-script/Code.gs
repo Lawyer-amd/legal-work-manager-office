@@ -15,6 +15,29 @@ function doGet(e) {
   }
 }
 
+function doPost(e) {
+  try {
+    var body = JSON.parse(e && e.postData && e.postData.contents || '{}')
+    if (body.action !== 'upsert' || !body.data) return json_({ ok: false, error: 'طلب حفظ غير صالح.' })
+    var spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID)
+    Object.keys(SHEETS).forEach(function (name) { writeRows_(spreadsheet, SHEETS[name], body.data[name] || []) })
+    return json_({ ok: true })
+  } catch (error) { return json_({ ok: false, error: String(error && error.message || error) }) }
+}
+
+function writeRows_(spreadsheet, sheetName, rows) {
+  var sheet = spreadsheet.getSheetByName(sheetName)
+  if (!sheet || !rows.length) return
+  var range = sheet.getDataRange()
+  var values = range.getValues()
+  var headers = values.length ? values[0].map(String) : Object.keys(rows[0])
+  if (!headers.length) return
+  var output = rows.map(function (record) { return headers.map(function (header) { var value = record[header]; if (Array.isArray(value) || (value && typeof value === 'object')) value = JSON.stringify(value); return value == null ? '' : value }) })
+  if (sheet.getMaxRows() > 1) sheet.getRange(2, 1, sheet.getMaxRows() - 1, headers.length).clearContent()
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+  if (output.length) sheet.getRange(2, 1, output.length, headers.length).setValues(output)
+}
+
 function json_(value, callback) {
   const payload = JSON.stringify(value)
   if (callback && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
