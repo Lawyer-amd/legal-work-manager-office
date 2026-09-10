@@ -1,6 +1,6 @@
 import type { Database } from './dataStore'
 
-export const defaultCloudEndpoint = 'https://script.google.com/macros/s/AKfycbyVbNxiYsiLynGzV31BQ_7BlL3m0shlfMOeOepqxQmHr7RNoWwfSOPHy32bMahpJAk31A/exec'
+export const defaultCloudEndpoint = 'https://script.google.com/macros/s/AKfycbzfD5HqzHL_mj3Y6KdcJYvB1LedGDTayfp6r0F9Uk7PHmH5mIbBxhF0-ydMUtJ6_msaeg/exec'
 const requestTimeoutMs = 15_000
 
 export class CloudSyncError extends Error {}
