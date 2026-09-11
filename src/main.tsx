@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useState } from 'react'
+import { StrictMode, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { type AppealStatus, type CaseStatus, type ClientType, DataStore, DataStoreError, type DocumentLink, type DocumentOwnerType, type ExecutionFollowUp, type ExecutionStatus, formatDate, isActive, type JudgmentType, type RecordType, type TaskStatus, type TransactionStatus } from './dataStore'
@@ -38,28 +38,44 @@ function App() {
   const judgments = data.judgments.filter(isActive)
   const appeals = data.appeals.filter(isActive)
   const activeSessions = data.sessions.filter(isActive).filter((session) => session.status === 'جديدة')
-  const refresh = () => setRevision((value) => value + 1)
+  const [dirty, setDirty] = useState(false)
+  const autoReadStarted = useRef(false)
+  const refresh = () => { setDirty(true); setRevision((value) => value + 1) }
   const [cloudMessage, setCloudMessage] = useState('')
   const [cloudBusy, setCloudBusy] = useState(false)
   const readCloud = async () => {
     setCloudBusy(true); setCloudMessage('جاري قراءة البيانات السحابية…')
-    try { store.replaceSnapshot(await readCloudSnapshot()); refresh(); setCloudMessage('تمت قراءة snapshot السحابي وحفظه محليًا. لم تُرسل أي تغييرات للسحابة.') }
+    try { store.replaceSnapshot(await readCloudSnapshot()); setDirty(false); setRevision((value) => value + 1); setCloudMessage('تمت قراءة snapshot السحابي وحفظه محليًا. لم تُرسل أي تغييرات للسحابة.') }
     catch (error) { setCloudMessage(error instanceof CloudSyncError ? error.message : 'تعذر قراءة البيانات السحابية.') }
     finally { setCloudBusy(false) }
   }
   const writeCloud = async () => {
     if (!window.confirm('سيتم استبدال صفوف Google Sheets بنسخة هذا الجهاز. تأكد من القراءة أولًا لتجنب فقد بيانات سحابية. هل تريد المتابعة؟')) return
     setCloudBusy(true); setCloudMessage('جاري حفظ البيانات السحابية…')
-    try { await writeCloudSnapshot(store.snapshot()); setCloudMessage('تم حفظ نسخة البيانات في السحابة.') }
+    try { await writeCloudSnapshot(store.snapshot()); setDirty(false); setCloudMessage('تم حفظ نسخة البيانات في السحابة.') }
     catch (error) { setCloudMessage(error instanceof CloudSyncError ? error.message : 'تعذر حفظ البيانات السحابية.') }
     finally { setCloudBusy(false) }
   }
   const syncCloud = async () => {
     setCloudBusy(true); setCloudMessage('جاري دمج بيانات الجهاز والسحابة…')
-    try { store.replaceSnapshot(await syncCloudSnapshot(store.snapshot())); refresh(); setCloudMessage('تمت المزامنة الثنائية بنجاح. حُفظت النسخة المدمجة في السحابة وعلى هذا الجهاز.') }
+    try { store.replaceSnapshot(await syncCloudSnapshot(store.snapshot())); setDirty(false); setRevision((value) => value + 1); setCloudMessage('تمت المزامنة الثنائية بنجاح. حُفظت النسخة المدمجة في السحابة وعلى هذا الجهاز.') }
     catch (error) { setCloudMessage(error instanceof CloudSyncError ? error.message : 'تعذر تنفيذ المزامنة الثنائية.') }
     finally { setCloudBusy(false) }
   }
+  useEffect(() => {
+    if (import.meta.env.MODE === 'test') return
+    if (autoReadStarted.current) return
+    autoReadStarted.current = true
+    void readCloud()
+  }, [])
+  useEffect(() => {
+    if (!dirty || cloudBusy) return
+    const timer = window.setTimeout(async () => {
+      try { await writeCloudSnapshot(store.snapshot()); setDirty(false); setCloudMessage('تم حفظ التعديل تلقائيًا في السحابة.') }
+      catch (error) { setCloudMessage(error instanceof CloudSyncError ? error.message : 'تعذر الحفظ التلقائي في السحابة.') }
+    }, 2500)
+    return () => window.clearTimeout(timer)
+  }, [revision, dirty, cloudBusy])
   useEffect(() => { const timer = window.setInterval(() => { store.cleanupTrash(); setRevision((value) => value + 1) }, 60_000); return () => window.clearInterval(timer) }, [])
 
   return (
