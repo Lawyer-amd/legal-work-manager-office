@@ -2,7 +2,7 @@ import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { type AppealStatus, type CaseStatus, type ClientType, DataStore, DataStoreError, type DocumentLink, type DocumentOwnerType, type ExecutionFollowUp, type ExecutionStatus, formatDate, isActive, type JudgmentType, type RecordType, type TaskStatus, type TransactionStatus } from './dataStore'
-import { CloudSyncError, readCloudSnapshot, writeCloudSnapshot } from './cloudSync'
+import { CloudSyncError, defaultCloudEndpoint, readCloudSnapshot, writeCloudSnapshot } from './cloudSync'
 
 const workspaceDefinitions = [
   { id: 'اليوم', label: 'اليوم', description: 'المواعيد والتنبيهات', sections: ['لوحة المتابعة'] },
@@ -624,4 +624,14 @@ function AppealsPanel({ clients, cases, judgments, appeals, refresh }: { clients
   </section>
 }
 
-createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)
+const isGitHubPages = window.location.hostname === 'lawyer-amd.github.io'
+
+if (isGitHubPages) {
+  // GitHub Pages cannot reliably send an authenticated POST to a web app whose
+  // access is restricted to the owner. Keep the public URL as an entry point,
+  // then run the application inside Apps Script where google.script.run uses
+  // the signed-in Google account without CORS or public API access.
+  window.location.replace(defaultCloudEndpoint)
+} else {
+  createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)
+}
