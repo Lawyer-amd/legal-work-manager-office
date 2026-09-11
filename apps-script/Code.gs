@@ -26,6 +26,7 @@ function doPost(e) {
     ALL_COLLECTIONS.forEach(function (name) {
       writeRows_(spreadsheet, SHEETS[name], body.data[name] || [])
     })
+    SpreadsheetApp.flush()
     return json_({ ok: true })
   } catch (error) { return json_({ ok: false, error: String(error && error.message || error) }) }
 }
@@ -42,6 +43,7 @@ function saveCloudSnapshot(data) {
   ALL_COLLECTIONS.forEach(function (name) {
     writeRows_(spreadsheet, SHEETS[name], data[name] || [])
   })
+  SpreadsheetApp.flush()
   return { ok: true }
 }
 
@@ -73,6 +75,7 @@ function json_(value, callback) {
 
 function readSnapshot_() {
   const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID)
+  SpreadsheetApp.flush()
   const result = {}
   ALL_COLLECTIONS.forEach(function (name) { result[name] = [] })
   result.clients = rows_(spreadsheet, SHEETS.clients, client_)

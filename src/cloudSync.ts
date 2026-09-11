@@ -1,6 +1,6 @@
 import type { Database } from './dataStore'
 
-export const defaultCloudEndpoint = 'https://script.google.com/macros/s/AKfycbw_zsFooJ26WodKcO6oOnSbZc13iseJGwfehHz60D71kmp7NTYpYZsYAUY-K16e3IXubw/exec'
+export const defaultCloudEndpoint = 'https://script.google.com/macros/s/AKfycbxVDdzyj5HY_GP8heeebBsg5CpbNHlc4GgvMJLO78xgtn-5iQTfJc8K5RhdSVO_R-UM4A/exec'
 const requestTimeoutMs = 15_000
 const apiEndpoint = (endpoint: string) => `${endpoint}${endpoint.includes('?') ? '&' : '?'}api=1`
 
