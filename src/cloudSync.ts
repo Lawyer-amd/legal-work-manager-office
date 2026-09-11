@@ -111,6 +111,24 @@ export async function writeCloudSnapshot(database: Database, endpoint = import.m
   if (!payload || typeof payload !== 'object' || (payload as { ok?: boolean }).ok !== true) throw new CloudSyncError('رفضت خدمة السحابة عملية الحفظ.')
 }
 
+/** Merge the device and cloud snapshots by record id, preferring the newest updatedAt. */
+export async function syncCloudSnapshot(local: Database, endpoint = import.meta.env.VITE_APPS_SCRIPT_URL || defaultCloudEndpoint, fetcher: typeof fetch = fetch): Promise<Database> {
+  const cloud = await readCloudSnapshot(endpoint, fetcher)
+  const merged = {} as Database
+  for (const name of collections) {
+    const byId = new Map<string, Record<string, unknown>>()
+    for (const record of [...(cloud[name] as unknown as Array<Record<string, unknown>>), ...(local[name] as unknown as Array<Record<string, unknown>>)]) {
+      const id = String(record.id || '')
+      if (!id) continue
+      const previous = byId.get(id)
+      if (!previous || Date.parse(String(record.updatedAt || '')) >= Date.parse(String(previous.updatedAt || ''))) byId.set(id, record)
+    }
+    ;(merged as unknown as Record<string, unknown[]>)[name] = Array.from(byId.values())
+  }
+  await writeCloudSnapshot(merged, endpoint, fetcher)
+  return structuredClone(merged)
+}
+
 function readCloudSnapshotJsonp(endpoint: string): Promise<Database> {
   return new Promise((resolve, reject) => {
     const callbackName = `__legalCloudSnapshot_${Date.now()}_${Math.random().toString(36).slice(2)}`
