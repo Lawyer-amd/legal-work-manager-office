@@ -5,15 +5,17 @@
 - الفرع: `astra-008-redesign`
 - التطبيق المنشور يعمل عبر Google Apps Script بصلاحية وصول «أنا فقط».
 - قاعدة البيانات المشتركة هي Google Sheets، والمرفقات/المستندات عبر روابط Google Drive.
-- الإصدار المنشور الأخير هو Apps Script deployment 13.
-- رابط التطبيق: https://script.google.com/macros/s/AKfycbx5LhdN9WykSLjP0OHBsRQe_uVhFpw2e6mi_fT8J25GtAiz8exTurUfsozo5_a7kofAkA/exec
+- الإصدار المنشور الأخير هو Apps Script deployment 14.
+- رابط التطبيق: https://script.google.com/macros/s/AKfycbw_zsFooJ26WodKcO6oOnSbZc13iseJGwfehHz60D71kmp7NTYpYZsYAUY-K16e3IXubw/exec
 
 ## ما تم إنجازه
 
 - قراءة وكتابة Snapshot لجميع اللوحات الأساسية.
 - إصلاح ملف `apps-script/Index.html` ونشره بنجاح.
 - إضافة زر «مزامنة ثنائية الآن» يدمج السجلات حسب `updatedAt` ثم يحفظ النسخة المدمجة.
-- الاختبارات الحالية: 24/24 ناجحة، والبناء ناجح.
+- إضافة قراءة تلقائية عند فتح التطبيق وحفظ تلقائي بعد 2.5 ثانية من توقف التعديل.
+- تم التحقق من القراءة التلقائية على الإصدار 14 برسالة نجاح.
+- البناء ناجح؛ 23 اختبارًا ناجحًا واختبار تاريخ واحد متأثر بفارق المنطقة الزمنية.
 
 ## القيود
 
