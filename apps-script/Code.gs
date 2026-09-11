@@ -47,10 +47,10 @@ function saveCloudSnapshot(data) {
 
 function writeRows_(spreadsheet, sheetName, rows) {
   var sheet = spreadsheet.getSheetByName(sheetName)
-  if (!sheet || !rows.length) return
+  if (!sheet) return
   var range = sheet.getDataRange()
   var values = range.getValues()
-  var headers = values.length ? values[0].map(String) : Object.keys(rows[0])
+  var headers = values.length ? values[0].map(String) : Object.keys(rows[0] || {})
   if (!headers.length) return
   var output = rows.map(function (record) { return headers.map(function (header) { var value = record[header] != null ? record[header] : record[headerKey_(header)]; if (Array.isArray(value) || (value && typeof value === 'object')) value = JSON.stringify(value); return value == null ? '' : value }) })
   if (sheet.getMaxRows() > 1) sheet.getRange(2, 1, sheet.getMaxRows() - 1, headers.length).clearContent()
