@@ -301,29 +301,38 @@ function ClientsPanel({ clients, cases, sessions, refresh }: { clients: ReturnTy
   const [birthDate, setBirthDate] = useState('')
   const [gender, setGender] = useState('')
   const [iban, setIban] = useState('')
+  const [formError, setFormError] = useState('')
   const orderedClients = [...clients].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
-    if (!name.trim()) return
-    const input = { name: name.trim(), clientType, phone, nationalId, birthDate, gender, iban, registeredAt: editingId ? clients.find((client) => client.id === editingId)?.registeredAt ?? new Date().toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10) }
+    const normalizedName = name.trim()
+    const normalizedPhone = phone.trim()
+    if (!normalizedName) return setFormError('أدخل اسم العميل قبل الحفظ.')
+    if (!normalizedPhone) return setFormError('أدخل رقم الجوال قبل الحفظ.')
+    if (!/^[0-9٠-٩+()\s-]{7,20}$/.test(normalizedPhone)) return setFormError('أدخل رقم جوال صالحًا قبل الحفظ.')
+    if (!gender) return setFormError('اختر الجنس أو «شركة» قبل الحفظ.')
+    setFormError('')
+    const input = { name: normalizedName, clientType, phone: normalizedPhone, nationalId, birthDate, gender, iban, registeredAt: editingId ? clients.find((client) => client.id === editingId)?.registeredAt ?? new Date().toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10) }
     if (editingId) store.updateClient(editingId, input); else store.addClient(input)
     clearForm(); refresh()
   }
-  const clearForm = () => { setName(''); setPhone(''); setNationalId(''); setBirthDate(''); setGender(''); setIban(''); setClientType('استشارة'); setEditingId(undefined); setShowForm(false) }
+  const clearForm = () => { setName(''); setPhone(''); setNationalId(''); setBirthDate(''); setGender(''); setIban(''); setClientType('استشارة'); setFormError(''); setEditingId(undefined); setShowForm(false) }
   const edit = (id: string) => {
     const client = clients.find((item) => item.id === id); if (!client) return
-    setEditingId(id); setName(client.name); setClientType(client.clientType); setPhone(client.phone ?? ''); setNationalId(client.nationalId ?? ''); setBirthDate(client.birthDate ?? ''); setGender(client.gender ?? ''); setIban(client.iban ?? ''); setShowForm(true)
+    setEditingId(id); setName(client.name); setClientType(client.clientType); setPhone(client.phone ?? ''); setNationalId(client.nationalId ?? ''); setBirthDate(client.birthDate ?? ''); setGender(client.gender ?? ''); setIban(client.iban ?? ''); setFormError(''); setShowForm(true)
   }
   return <section className="panel">
     <div className="section-actions"><h3>العملاء</h3><div className="section-actions-buttons"><button className="secondary" onClick={() => { const nextFor = (clientId: string) => { const caseIds = cases.filter((legalCase) => legalCase.clientId === clientId).map((legalCase) => legalCase.id); return sessions.filter((session) => caseIds.includes(session.caseId) && session.status === 'جديدة').map((session) => `${session.date}${session.time ?? ''}`).sort()[0] ?? '9999' }; store.reorderClients([...clients].sort((a, b) => nextFor(a.id).localeCompare(nextFor(b.id))).map((client) => client.id)); refresh() }}>إعادة الترتيب حسب الموعد الأقرب</button><button className="primary" onClick={() => { clearForm(); setShowForm(true) }}>إضافة عميل</button></div></div>
-    {showForm && <form className="record-form" onSubmit={submit}>
-      <label>اسم العميل<input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>
+    {showForm && <form className="record-form" noValidate onSubmit={submit}>
+      <p className="form-help wide">الحقول المعلّمة بـ <b>*</b> إلزامية قبل الحفظ.</p>
+      <label>اسم العميل <b>*</b><input autoFocus value={name} onChange={(event) => { setName(event.target.value); setFormError('') }} /></label>
       <label>نوع العميل<select value={clientType} onChange={(event) => setClientType(event.target.value as ClientType)}>{['استشارة', 'تعقيب', 'عقد توكيل', 'عن بعد'].map((type) => <option key={type}>{type}</option>)}</select></label>
-      <label>رقم الجوال<input inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} /></label>
+      <label>رقم الجوال <b>*</b><input inputMode="tel" value={phone} onChange={(event) => { setPhone(event.target.value); setFormError('') }} /></label>
       <label>رقم الهوية<input value={nationalId} onChange={(event) => setNationalId(event.target.value)} /></label>
       <label>تاريخ الميلاد<input type="date" value={birthDate} onChange={(event) => setBirthDate(event.target.value)} /></label>
-      <label>الجنس<select value={gender} onChange={(event) => setGender(event.target.value)}><option value="">اختر</option>{['ذكر', 'أنثى', 'شركة', 'أخرى'].map((option) => <option key={option}>{option}</option>)}</select></label>
+      <label>الجنس <b>*</b><select value={gender} onChange={(event) => { setGender(event.target.value); setFormError('') }}><option value="">اختر</option>{['ذكر', 'أنثى', 'شركة', 'أخرى'].map((option) => <option key={option}>{option}</option>)}</select></label>
       <label>رقم الآيبان<input value={iban} onChange={(event) => setIban(event.target.value)} /></label>
+      {formError && <p className="form-error wide" role="alert">{formError}</p>}
       <div className="form-actions"><button type="button" onClick={clearForm}>إلغاء</button><button className="primary" type="submit">{editingId ? 'حفظ التعديل' : 'حفظ العميل'}</button></div>
     </form>}
     <div className="table-wrap"><table><thead><tr><th>العميل</th><th>مرتبط بـ</th><th>نوع العميل</th><th>تاريخ التسجيل</th><th>الإجراء</th></tr></thead><tbody>

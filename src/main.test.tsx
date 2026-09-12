@@ -82,6 +82,16 @@ describe('واجهة التطبيق', () => {
     expect(document.body.textContent).toContain('القضايا الحالية')
   })
 
+  it('توضح الحقول الإلزامية قبل حفظ عميل جديد', async () => {
+    await click(button('العملاء'))
+    await click(button('إضافة عميل'))
+    await click(button('حفظ العميل'))
+    expect(document.body.textContent).toContain('أدخل اسم العميل قبل الحفظ.')
+    expect(document.body.textContent).toContain('رقم الجوال *')
+    expect(document.body.textContent).toContain('الجنس *')
+    await click(button('إلغاء'))
+  })
+
   it('تحفظ إعدادات الواجهة وتطبّق اسم المكتب', async () => {
     await click(button('الإعدادات'))
     expect(document.body.textContent).toContain('التنبيه قبل انتهاء الوكالة بالأيام')
