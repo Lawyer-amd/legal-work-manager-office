@@ -12,9 +12,9 @@ const workspaceDefinitions = [
   { id: 'المستندات', label: 'المستندات', description: 'فهرس روابط الملفات', sections: ['المستندات'] },
 ] as const
 type WorkspaceId = typeof workspaceDefinitions[number]['id']
-type AppSettings = { officeName: string; landingWorkspace: WorkspaceId; agencyWarningDays: number; compactTables: boolean }
+type AppSettings = { officeName: string; landingWorkspace: WorkspaceId; agencyWarningDays: number; compactTables: boolean; autoSync: boolean }
 const settingsKey = 'legal-work-manager:settings:v1'
-const defaultSettings: AppSettings = { officeName: 'إدارة العمل القانوني', landingWorkspace: 'اليوم', agencyWarningDays: 20, compactTables: false }
+const defaultSettings: AppSettings = { officeName: 'إدارة العمل القانوني', landingWorkspace: 'اليوم', agencyWarningDays: 20, compactTables: false, autoSync: true }
 const loadSettings = (): AppSettings => {
   try {
     const parsed = JSON.parse(localStorage.getItem(settingsKey) ?? '{}') as Partial<AppSettings>
@@ -76,6 +76,13 @@ function App() {
     }, 2500)
     return () => window.clearTimeout(timer)
   }, [revision, dirty, cloudBusy])
+  useEffect(() => {
+    if (import.meta.env.MODE === 'test' || !settings.autoSync) return
+    const timer = window.setInterval(() => {
+      if (!dirty && !cloudBusy) void syncCloud()
+    }, 5 * 60_000)
+    return () => window.clearInterval(timer)
+  }, [settings.autoSync, dirty, cloudBusy])
   useEffect(() => { const timer = window.setInterval(() => { store.cleanupTrash(); setRevision((value) => value + 1) }, 60_000); return () => window.clearInterval(timer) }, [])
 
   return (
@@ -217,6 +224,7 @@ function SettingsPanel({ settings, onSave, onReset, onReadCloud, onWriteCloud, o
       <label>الصفحة عند فتح التطبيق<select value={form.landingWorkspace} onChange={(event) => setForm({ ...form, landingWorkspace: event.target.value as WorkspaceId })}>{workspaceDefinitions.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.label}</option>)}</select></label>
       <label>التنبيه قبل انتهاء الوكالة بالأيام<input type="number" min="1" max="90" value={form.agencyWarningDays} onChange={(event) => setForm({ ...form, agencyWarningDays: Number(event.target.value) })} /><small>يُعرض التنبيه في صفحة اليوم للقضايا الفعالة.</small></label>
       <label className="setting-toggle">كثافة الجداول<input type="checkbox" checked={form.compactTables} onChange={(event) => setForm({ ...form, compactTables: event.target.checked })} /><span>عرض مضغوط للصفوف</span></label>
+      <label className="setting-toggle">المزامنة التلقائية<input type="checkbox" checked={form.autoSync} onChange={(event) => setForm({ ...form, autoSync: event.target.checked })} /><span>دمج آمن كل 5 دقائق عند عدم وجود تعديل جارٍ.</span></label>
       <div className="form-actions"><button type="button" onClick={() => { onReset(); setMessage('تمت استعادة إعدادات العرض الافتراضية.') }}>استعادة الإعدادات الافتراضية</button><button className="primary" type="submit">حفظ الإعدادات</button></div>
     </form>
     <div className="settings-note"><b>حفظ محلي</b><p>تحفظ هذه الخيارات في متصفح هذا الجهاز، وتبقى بيانات التطبيق وسجلاته مستقلة عنها.</p></div>
