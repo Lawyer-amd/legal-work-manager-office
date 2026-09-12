@@ -31,7 +31,7 @@ describe('واجهة التطبيق', () => {
     expect(document.body.textContent).toContain('فهرس المستندات')
     await click(button('إضافة مستند'))
     expect(document.body.textContent).toContain('رابط المستند على Google Drive')
-    expect(document.body.textContent).toContain('ربط المستند بالسجلات')
+    expect(document.body.textContent).toContain('ارتباط المستند')
     expect(document.body.textContent).toContain('عميل تجريبي')
   })
 

@@ -239,33 +239,49 @@ function DocumentsPanel({ data, refresh }: { data: ReturnType<DataStore['snapsho
   const [message, setMessage] = useState('')
   const empty = { name: '', documentType: 'مرفق عام', url: '', notes: '', documentDate: '', links: [] as DocumentLink[] }
   const [form, setForm] = useState(empty)
+  const [selectedClientId, setSelectedClientId] = useState('')
+  const [targetType, setTargetType] = useState<'clients' | 'cases' | 'tasks' | 'executions'>('cases')
+  const [targetId, setTargetId] = useState('')
   const documents = data.documents.filter(isActive)
-  const ownerGroups: { type: DocumentOwnerType; title: string; items: { id: string; label: string }[] }[] = [
-    { type: 'clients', title: 'العملاء', items: data.clients.filter(isActive).map((item) => ({ id: item.id, label: item.name })) },
-    { type: 'cases', title: 'القضايا', items: data.cases.filter(isActive).map((item) => ({ id: item.id, label: `قضية ${item.caseNumber}` })) },
-    { type: 'sessions', title: 'الجلسات', items: data.sessions.filter(isActive).map((item) => ({ id: item.id, label: `جلسة ${formatDate(item.date)}` })) },
-    { type: 'transactions', title: 'المعاملات', items: data.transactions.filter(isActive).map((item) => ({ id: item.id, label: item.statement })) },
-    { type: 'tasks', title: 'المهام', items: data.tasks.filter(isActive).map((item) => ({ id: item.id, label: item.statement })) },
-    { type: 'executions', title: 'التنفيذ', items: data.executions.filter(isActive).map((item) => ({ id: item.id, label: `طلب ${item.requestNumber}` })) },
-    { type: 'judgments', title: 'الأحكام', items: data.judgments.filter(isActive).map((item) => ({ id: item.id, label: `صك ${item.deedNumber}` })) },
-    { type: 'appeals', title: 'الاستئناف', items: data.appeals.filter(isActive).map((item) => ({ id: item.id, label: item.judgmentText || 'استئناف' })) },
-  ]
-  const ownerLabel = (link: DocumentLink) => ownerGroups.find((group) => group.type === link.type)?.items.find((item) => item.id === link.id)?.label ?? 'سجل في السلة'
-  const clear = () => { setForm(empty); setEditingId(undefined); setShowForm(false); setMessage('') }
-  const toggleLink = (link: DocumentLink) => setForm((current) => {
-    const exists = current.links.some((item) => item.type === link.type && item.id === link.id)
-    return { ...current, links: exists ? current.links.filter((item) => item.type !== link.type || item.id !== link.id) : [...current.links, link] }
-  })
+  const clients = data.clients.filter(isActive)
+  const cases = data.cases.filter(isActive)
+  const tasks = data.tasks.filter(isActive)
+  const executions = data.executions.filter(isActive)
+  const ownerLabel = (link: DocumentLink) => {
+    if (link.type === 'clients') return clients.find((item) => item.id === link.id)?.name ?? 'عميل في السلة'
+    if (link.type === 'cases') return cases.find((item) => item.id === link.id)?.caseNumber ? `قضية ${cases.find((item) => item.id === link.id)?.caseNumber}` : 'قضية في السلة'
+    if (link.type === 'tasks') return tasks.find((item) => item.id === link.id)?.statement ?? 'مهمة في السلة'
+    if (link.type === 'executions') return executions.find((item) => item.id === link.id)?.requestNumber ? `طلب ${executions.find((item) => item.id === link.id)?.requestNumber}` : 'طلب تنفيذ في السلة'
+    return 'رابط قديم'
+  }
+  const relatedOptions = targetType === 'cases'
+    ? cases.filter((item) => item.clientId === selectedClientId).map((item) => ({ id: item.id, label: `قضية ${item.caseNumber} — ${item.opponentName}` }))
+    : targetType === 'tasks'
+      ? tasks.filter((item) => { const legalCase = cases.find((legalCase) => legalCase.id === item.caseId); return legalCase?.clientId === selectedClientId || (!item.caseId && item.clientName === clients.find((client) => client.id === selectedClientId)?.name) }).map((item) => ({ id: item.id, label: item.statement }))
+      : executions.filter((item) => cases.some((legalCase) => legalCase.id === item.caseId && legalCase.clientId === selectedClientId)).map((item) => ({ id: item.id, label: `طلب ${item.requestNumber} — ${item.claimant} ضد ${item.respondent}` }))
+  const clear = () => { setForm(empty); setSelectedClientId(''); setTargetType('cases'); setTargetId(''); setEditingId(undefined); setShowForm(false); setMessage('') }
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
     try {
-      if (editingId) store.updateDocument(editingId, form); else store.addDocument(form)
+      if (!selectedClientId) return setMessage('اختر العميل المرتبط بالمستند.')
+      if (targetType !== 'clients' && !targetId) return setMessage('اختر السجل المرتبط بالمستند.')
+      const link = targetType === 'clients' ? { type: 'clients' as const, id: selectedClientId } : { type: targetType, id: targetId }
+      const payload = { ...form, links: [link] }
+      if (editingId) store.updateDocument(editingId, payload); else store.addDocument(payload)
       clear(); refresh()
     } catch (error) { setMessage(error instanceof DataStoreError ? error.message : 'تعذر حفظ المستند.') }
   }
-  const edit = (document: typeof documents[number]) => { setEditingId(document.id); setForm({ name: document.name, documentType: document.documentType, url: document.url, notes: document.notes ?? '', documentDate: document.documentDate ?? '', links: document.links }); setShowForm(true); setMessage('') }
+  const edit = (document: typeof documents[number]) => {
+    const link = document.links[0]
+    const linkedCase = link?.type === 'cases' ? cases.find((item) => item.id === link.id) : undefined
+    const linkedTask = link?.type === 'tasks' ? tasks.find((item) => item.id === link.id) : undefined
+    const linkedExecution = link?.type === 'executions' ? executions.find((item) => item.id === link.id) : undefined
+    const linkedExecutionCase = linkedExecution ? cases.find((item) => item.id === linkedExecution.caseId) : undefined
+    const clientId = link?.type === 'clients' ? link.id : (linkedCase?.clientId ?? (linkedTask?.caseId ? cases.find((item) => item.id === linkedTask.caseId)?.clientId : undefined) ?? linkedExecutionCase?.clientId ?? '')
+    setEditingId(document.id); setForm({ name: document.name, documentType: document.documentType, url: document.url, notes: document.notes ?? '', documentDate: document.documentDate ?? '', links: document.links }); setSelectedClientId(clientId); setTargetType(link?.type === 'cases' || link?.type === 'tasks' || link?.type === 'executions' ? link.type : 'clients'); setTargetId(link?.type === 'clients' ? '' : link?.id ?? ''); setShowForm(true); setMessage('')
+  }
   return <section className="panel">
-    <div className="section-actions"><div><h3>فهرس المستندات</h3><p className="muted">اربط ملف Google Drive بسجل واحد أو بعدة سجلات، ثم افتحه مباشرة من التطبيق.</p></div>{showForm ? <button className="primary" type="submit" form="document-form">{editingId ? 'حفظ التعديل' : 'حفظ المستند'}</button> : <button className="primary" onClick={() => { clear(); setShowForm(true) }}>إضافة مستند</button>}</div>
+    <div className="section-actions"><div><h3>فهرس المستندات</h3><p className="muted">كل مستند يرتبط بعميل واحد وسجل واحد اختياري تابع له.</p></div>{showForm ? <button className="primary" type="submit" form="document-form">{editingId ? 'حفظ التعديل' : 'حفظ المستند'}</button> : <button className="primary" onClick={() => { clear(); setShowForm(true) }}>إضافة مستند</button>}</div>
     {message && <p className="notice warning" role="alert">{message}</p>}
     {showForm && <form id="document-form" className="record-form document-form" onSubmit={submit}>
       <label>اسم المستند<input autoFocus required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="مثال: صك الحكم النهائي" /></label>
@@ -273,10 +289,10 @@ function DocumentsPanel({ data, refresh }: { data: ReturnType<DataStore['snapsho
       <label className="wide">رابط المستند على Google Drive<input required type="url" dir="ltr" value={form.url} onChange={(event) => setForm({ ...form, url: event.target.value })} placeholder="https://drive.google.com/..." /></label>
       <label>تاريخ المستند<input type="date" value={form.documentDate} onChange={(event) => setForm({ ...form, documentDate: event.target.value })} /></label>
       <label>ملاحظات<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
-      <fieldset className="document-links wide"><legend>ربط المستند بالسجلات</legend>{ownerGroups.filter((group) => group.items.length).map((group) => <section key={group.type}><h4>{group.title}</h4><div>{group.items.map((item) => { const checked = form.links.some((link) => link.type === group.type && link.id === item.id); return <label className="document-check" key={item.id}><input type="checkbox" checked={checked} onChange={() => toggleLink({ type: group.type, id: item.id })} />{item.label}</label> })}</div></section>)}</fieldset>
+      <fieldset className="document-links wide"><legend>ارتباط المستند</legend><label>العميل الأساسي<select required value={selectedClientId} onChange={(event) => { setSelectedClientId(event.target.value); setTargetId('') }}><option value="">اختر العميل</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label><label>نوع السجل التابع<select value={targetType} onChange={(event) => { setTargetType(event.target.value as 'clients' | 'cases' | 'tasks' | 'executions'); setTargetId('') }}><option value="clients">العميل نفسه</option><option value="cases">قضية</option><option value="executions">طلب تنفيذ</option><option value="tasks">مهمة</option></select></label>{targetType !== 'clients' && <label>السجل المرتبط<select required value={targetId} onChange={(event) => setTargetId(event.target.value)}><option value="">اختر السجل</option>{relatedOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}<p className="form-help wide">لا يتم ربط المستند بالجلسات. اختر عميلًا واحدًا وسجلًا تابعًا واحدًا فقط.</p></fieldset>
       <div className="form-actions"><button type="button" onClick={clear}>إلغاء</button></div>
     </form>}
-    {documents.length ? <div className="table-wrap"><table><thead><tr><th>المستند</th><th>النوع</th><th>التاريخ</th><th>مرتبط بـ</th><th>الرابط</th><th>الإجراءات</th></tr></thead><tbody>{documents.map((document) => <tr key={document.id}><td><b>{document.name}</b>{document.notes && <small className="block">{document.notes}</small>}</td><td>{document.documentType}</td><td>{document.documentDate ? formatDate(document.documentDate) : '—'}</td><td><div className="document-badges">{document.links.map((link) => <span key={`${link.type}:${link.id}`}>{typeNames[link.type]}: {ownerLabel(link)}</span>)}</div></td><td><a className="document-open" href={document.url} target="_blank" rel="noreferrer">فتح المستند</a></td><td className="row-actions"><button onClick={() => edit(document)}>تعديل</button><button className="danger-link" onClick={() => setDeleteTarget({ id: document.id, name: document.name })}>حذف</button></td></tr>)}</tbody></table></div> : <div className="empty-state"><h3>لا توجد مستندات مرتبطة</h3><p>أضف أول رابط لمستند محفوظ على Google Drive.</p></div>}
+    {documents.length ? <div className="table-wrap"><table><thead><tr><th>المستند</th><th>النوع</th><th>التاريخ</th><th>الارتباط</th><th>الرابط</th><th>الإجراءات</th></tr></thead><tbody>{documents.map((document) => <tr key={document.id}><td><b>{document.name}</b>{document.notes && <small className="block">{document.notes}</small>}</td><td>{document.documentType}</td><td>{document.documentDate ? formatDate(document.documentDate) : '—'}</td><td><div className="document-badges">{document.links.length ? <span>↳ {ownerLabel(document.links[0])}{document.links.length > 1 ? ` + ${document.links.length - 1} قديم` : ''}</span> : <span>غير مرتبط</span>}</div></td><td><a className="document-open" href={document.url} target="_blank" rel="noreferrer">فتح المستند</a></td><td className="row-actions"><button onClick={() => edit(document)}>تعديل</button><button className="danger-link" onClick={() => setDeleteTarget({ id: document.id, name: document.name })}>حذف</button></td></tr>)}</tbody></table></div> : <div className="empty-state"><h3>لا توجد مستندات مرتبطة</h3><p>أضف أول رابط لمستند محفوظ على Google Drive.</p></div>}
     {deleteTarget && <TwoStepDeleteDialog title="نقل المستند إلى سلة المحذوفات" message={`هل تريد نقل المستند «${deleteTarget.name}» إلى السلة؟`} onCancel={() => setDeleteTarget(undefined)} onConfirm={() => { store.moveToTrash('documents', deleteTarget.id); setDeleteTarget(undefined); refresh() }} />}
   </section>
 }
