@@ -59,7 +59,7 @@ describe('واجهة التطبيق', () => {
     const dateInput = label?.querySelector('input') as HTMLInputElement | null
     if (!dateInput) throw new Error('حقل انتهاء الوكالة غير موجود')
     await act(async () => {
-      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 5)
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 6)
       const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
       valueSetter?.call(dateInput, tomorrow.toISOString().slice(0, 10))
       dateInput.dispatchEvent(new Event('input', { bubbles: true }))

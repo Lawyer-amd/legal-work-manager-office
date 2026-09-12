@@ -228,7 +228,7 @@ function SettingsPanel({ settings, onSave, onReset, onReadCloud, onWriteCloud, o
       <div className="form-actions"><button type="button" onClick={() => { onReset(); setMessage('تمت استعادة إعدادات العرض الافتراضية.') }}>استعادة الإعدادات الافتراضية</button><button className="primary" type="submit">حفظ الإعدادات</button></div>
     </form>
     <div className="settings-note"><b>حفظ محلي</b><p>تحفظ هذه الخيارات في متصفح هذا الجهاز، وتبقى بيانات التطبيق وسجلاته مستقلة عنها.</p></div>
-    <div className="settings-note"><b>المزامنة السحابية</b><p>المزامنة الثنائية تقرأ Sheets وتدمج السجلات الأحدث ثم تحفظ النسخة المدمجة.</p><button className="secondary" type="button" onClick={onReadCloud} disabled={cloudBusy}>{cloudBusy ? 'جاري القراءة…' : 'قراءة البيانات السحابية الآن'}</button> <button className="primary" type="button" onClick={onWriteCloud} disabled={cloudBusy}>{cloudBusy ? 'جاري الحفظ…' : 'حفظ البيانات في السحابة'}</button> <button className="secondary" type="button" onClick={onSyncCloud} disabled={cloudBusy}>{cloudBusy ? 'جاري الدمج…' : 'مزامنة ثنائية الآن'}</button></div>
+    <div className="settings-note"><b>☁ المزامنة السحابية</b><p>تُقرأ البيانات وتُدمج مع Sheets وفق آخر تعديل معروف، مع إبقاء النسخة المحلية قابلة للاستخدام.</p><div className="cloud-actions"><button className="secondary" type="button" onClick={onReadCloud} disabled={cloudBusy}>↓ {cloudBusy ? 'جاري القراءة…' : 'قراءة السحابة'}</button><button className="primary" type="button" onClick={onWriteCloud} disabled={cloudBusy}>↑ {cloudBusy ? 'جاري الحفظ…' : 'حفظ في السحابة'}</button><button className="secondary" type="button" onClick={onSyncCloud} disabled={cloudBusy}>↻ {cloudBusy ? 'جاري الدمج…' : 'مزامنة ثنائية'}</button></div></div>
   </section>
 }
 
