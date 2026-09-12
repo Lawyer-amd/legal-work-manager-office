@@ -94,7 +94,7 @@ function App() {
             <p className="eyebrow">{activeSection === 'لوحة المتابعة' ? 'مركز يوم العمل' : workspaceForSection(activeSection)}</p>
             <h2>{activeSection === 'لوحة المتابعة' ? 'اليوم' : activeSection}</h2>
           </div>
-          <button className="header-settings" onClick={() => setActiveSection('الإعدادات')}>الإعدادات</button>
+          <div className="header-quick-actions"><button className="header-settings" onClick={() => setActiveSection('الإعدادات')}>الإعدادات</button><button className="header-settings" onClick={() => setActiveSection('سلة المحذوفات')}>سلة المحذوفات</button></div>
         </header>
         {store.getLoadWarning() && <p className="notice warning">{store.getLoadWarning()}</p>}
         {cloudMessage && <p className="notice" role="status">{cloudMessage}</p>}

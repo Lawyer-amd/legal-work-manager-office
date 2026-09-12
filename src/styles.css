@@ -17,12 +17,13 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .workspace-nav small { color: inherit; opacity: .72; font-size: 11px; }
 .section-nav { margin: 14px 8px 0; padding: 11px 0 0; border-top: 1px solid #4c6b63; }
 .section-nav button { padding: 8px 10px !important; font-size: 13px; }
-.sidebar-footer { display: grid; gap: 4px; margin-top: auto; padding-top: 16px; border-top: 1px solid #4c6b63; }
+.sidebar-footer { display: grid; gap: 4px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #4c6b63; }
 .sidebar-footer button { color: #b6cbc2; font-size: 13px; }
 .content { max-width: 1680px; width: 100%; padding: 32px clamp(24px, 5vw, 72px) 60px; }
 header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 22px; border-bottom: 1px solid #dde2dc; }
 .eyebrow { color: #657786; margin: 0 0 5px; font-size: 14px; }
 h2 { margin: 0; font-size: 28px; }
+.header-quick-actions { display: flex; gap: 8px; }
 .header-settings { display: none; border: 1px solid #b8c8c0; border-radius: 8px; padding: 8px 12px; color: #31534a; background: #fff; }
 .primary { border: 0; border-radius: 8px; padding: 11px 18px; background: #24765c; color: white; }
 .primary:hover { background: #1b604a; }
@@ -164,4 +165,4 @@ tbody tr { cursor: grab; }
 .empty-state h3 { margin-top: 0; }
 .empty-state p { color: #51616e; line-height: 1.8; }
 @media (max-width: 1000px) { .dashboard-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } .timeline-item { grid-template-columns: auto minmax(180px, 1fr) auto; } .timeline-date { display: none; } }
-@media (max-width: 720px) { .app-shell { grid-template-columns: 1fr; } .sidebar { min-height: auto; padding: 18px; } .brand { padding-bottom: 16px; } .workspace-nav { grid-template-columns: repeat(2, 1fr); } .workspace-nav button { min-height: 58px; text-align: right !important; } .section-nav { grid-template-columns: repeat(3, 1fr) !important; margin-inline: 0; } .section-nav button { text-align: center !important; } .sidebar-footer { display: none; } .header-settings { display: inline-block; } .content { padding: 24px 18px 45px; } .stats, .record-form, .dashboard-stats, .dashboard-grid { grid-template-columns: 1fr; } .dashboard-hero, .deadline-alert, .dashboard-section-head { align-items: flex-start; flex-direction: column; } .hero-date { text-align: right; } .timeline-item { grid-template-columns: auto minmax(0, 1fr); } .timeline-date { display: grid; grid-column: 2; text-align: right; } .timeline-item .deadline-chip, .timeline-item .secondary { grid-column: 2; justify-self: start; } .dashboard-filters, .kind-filters { width: 100%; } }
+@media (max-width: 720px) { .app-shell { grid-template-columns: 1fr; } .sidebar { min-height: auto; padding: 18px; } .brand { padding-bottom: 16px; } .workspace-nav { grid-template-columns: repeat(2, 1fr); } .workspace-nav button { min-height: 58px; text-align: right !important; } .section-nav { grid-template-columns: repeat(3, 1fr) !important; margin-inline: 0; } .section-nav button { text-align: center !important; } .sidebar-footer { display: grid; } .header-settings { display: inline-block; } .content { padding: 24px 18px 45px; } .stats, .record-form, .dashboard-stats, .dashboard-grid { grid-template-columns: 1fr; } .dashboard-hero, .deadline-alert, .dashboard-section-head { align-items: flex-start; flex-direction: column; } .hero-date { text-align: right; } .timeline-item { grid-template-columns: auto minmax(0, 1fr); } .timeline-date { display: grid; grid-column: 2; text-align: right; } .timeline-item .deadline-chip, .timeline-item .secondary { grid-column: 2; justify-self: start; } .dashboard-filters, .kind-filters { width: 100%; } }
